@@ -1,0 +1,52 @@
+% Compilation process:
+% make compile
+% or
+% make book
+
+\documentclass[fullbook]{tufte_algorithms_book}
+
+% Remove empty pages (better for online PDF version)
+\let\cleardoublepage\clearpage
+
+\input{preamble}
+
+\setcounter{tocdepth}{2} % show subsection in TOC
+
+\title{Algorithms for Machine Learning}
+\author[Moss]{Robert J. Moss}
+\date{2021}
+
+\begin{document}
+
+\begin{jlcode}
+	include("../../jl/support_code.jl")
+\end{jlcode}
+
+\frontmatter
+\input{titlepage}
+% \include{copyrightpage}
+% \include{dedication}
+
+\forceheader{Contents}
+\tableofcontents\label{cha:toc}
+
+\include{chapter/acknowledgments}
+% \include{chapter/preface}
+\mainmatter
+
+\include{chapter/ch1-supervised-learning}
+
+\navheader{\currentname}
+% \solutions (currently UNUSED)
+
+\backmatter
+
+\chapter*{References}
+\addcontentsline{toc}{chapter}{References}
+\forceheader{References}
+\printbibliography[heading=none]
+
+\forceheader{Index}
+\printindex
+
+\end{document}

@@ -1,0 +1,173 @@
+% shared preamble code
+
+
+% Removes empty pages
+% \let\cleardoublepage\clearpage
+
+
+%%% PSET and quiz settings:
+\newcounter{pset}
+\newcommand{\newpset}{\stepcounter{pset}}
+\newcounter{quiz}
+\newcommand{\newquiz}{\stepcounter{quiz}}
+
+
+
+%%% Packages:
+\usepackage{datetime}
+\usepackage[titletoc,title]{appendix}
+\usepackage{enumitem}
+\usepackage{wrapfig}
+\usepackage{nameref}
+\usepackage{longtable,tabularx,booktabs}
+\usepackage[flushleft]{threeparttable}
+\usepackage{centernot}
+\usepackage[outline]{contour} % for outlining text.
+\usepackage{array}
+\usepackage[makeroom]{cancel}
+\usepackage{ifthen}
+\usepackage[usestackEOL]{stackengine}
+\usepackage{lipsum}
+\usepackage{xcolor}
+\usepackage{amsmath,amssymb,mathtools,bm,etoolbox}
+\usepackage{multirow}
+\usepackage{framed}
+% \usepackage{minted}
+
+%%% Package settings:
+\newdateformat{psetdate}{\monthname[\the\month] \the\day,  \the\year}
+
+
+%%% Custom commands
+\definecolor{stanfordred}{RGB}{140,21,21}
+\definecolor{darkgreen}{RGB}{21,140,21}
+\definecolor{darkblue}{RGB}{21,21,140}
+\definecolor{sun}{RGB}{234,171,0}
+\colorlet{shadecolor}{black!5}
+
+% \newcommand{\smallcaps}[1]{\textsc{#1}} % defined by tufte
+\newcommand\euler{ℯ} % not working.
+\makeatletter
+\newcommand*{\currentname}{\@currentlabelname}
+\makeatother
+
+% \newcommand{\red}[1]{{\color{red} #1}} % ENABLED
+\newcommand{\red}[1]{#1} % DISABLED
+
+% \newcommand{\blue}[1]{{\color{blue} #1}} % ENABLED
+\newcommand{\blue}[1]{#1} % DISABLED
+
+\newcommand{\darkblue}[1]{{\color{darkblue} #1}} % ENABLED
+% \newcommand{\darkblue}[1]{#1} % DISABLED
+
+% \newcommand{\green}[1]{{\color{darkgreen} #1}} % ENABLED
+\newcommand{\green}[1]{#1} % DISABLED
+
+\newcommand{\darkgreen}[1]{{\color{darkgreen} #1}} % ENABLED
+% \newcommand{\darkgreen}[1]{#1} % DISABLED
+
+\newcommand{\darkred}[1]{{\color{stanfordred} #1}} % ENABLED
+% \newcommand{\darkred}[1]{#1} % DISABLED
+
+\newcommand{\br}{\phantom{ }}
+% \newcommand{\snote}[1]{\sidenote[][0pt]{#1}}
+\renewcommand{\cite}[2][0pt]{\sidenote[][#1]{\fullcite{#2}.}}
+
+\newcommand{\ra}[1]{\renewcommand{\arraystretch}{#1}}
+\newcommand\tab[1][1cm]{\hspace*{#1}}
+\newcommand\tabhead[1]{\small\textbf{#1}}
+
+\let\oparagraph\paragraph
+\renewcommand{\paragraph}[1]{\oparagraph{\textbf{#1.}}}
+\newcommand{\bparagraph}[1]{\oparagraph{\upshape \textbf{#1}}}
+
+\newenvironment{problem}{%
+	\begin{fullwidth}
+}{%
+	\end{fullwidth}
+}
+
+\newenvironment{answer}{%
+	\begin{mdframed}[backgroundcolor=black!5,rightline=false,leftline=false]
+		\vspace{-\baselineskip}
+		\oparagraph{\textbf{Answer.}}
+}{%
+	\end{mdframed}
+}
+
+\newenvironment{overflowexample}{%
+	\begin{mdframed}[backgroundcolor=black!5,rightline=false,leftline=false]
+		\vspace{-\baselineskip}
+}{%
+	\end{mdframed}
+}
+
+% For Honor Code signing.
+% \newcommand{\blank}{\hrulefill{}}
+\newcommand{\ulfrule}{\xleaders\hbox{\underline{ }}\hfill\kern0pt}
+
+
+% https://tex.stackexchange.com/questions/369890/combining-equation-number-with-tag-and-referencing-both-independently
+\newcommand{\owntag}[1]{\stepcounter{equation}\tag{\theequation, #1}}
+
+% Shorthand url without http(s)
+\newcommand\rurl[1]{%
+  \href{https://#1}{\nolinkurl{#1}}%
+}
+
+
+%% from preamble.tex of prob_reference.tex
+\newenvironment{boxpar}
+{
+    \hspace*{0mm}
+    \begin{tabular}{|p{0.95\textwidth}|}
+    \hline
+}
+{
+    \\[2mm]\hline
+    \end{tabular}
+    \vspace*{0mm}
+} % boxes around paragraphs with titles
+
+
+% Used for Julia algorithm blocks inside floats (i.e. examples)
+\newenvironment*{exalgorithm}{}{}
+
+% See pythontex.sty: https://github.com/sisl/tufte_algorithms_book/issues/16
+
+% Expectation: https://tex.stackexchange.com/questions/229023/expectation-operator
+\providecommand\given{}
+\DeclarePairedDelimiterXPP\bbE[1]{\mathbb{E}}{[}{]}{}{
+\renewcommand\given{  \nonscript\:
+  \delimsize\vert
+  \nonscript\:
+  \mathopen{}
+  \allowbreak}
+#1
+}
+
+
+%%% Mathematical operators
+\input{mathematics}
+
+
+% TODO?: Box around important definitions (\newcommand\definition)?
+% TODO?: \card{..} instead of |..|
+% TODO?: \bbE{..} dynamic \left[ \right]
+
+
+%%% TikZ settings
+\tikzset{
+    func/.style = {rectangle, rounded corners=1, draw},
+    partial/.style = {rectangle, darkgreen, font=\bfseries},
+    input/.style = {rectangle},
+    nnnode/.style = {circle, draw=black, fill=white, minimum size=16pt,},
+}
+
+
+%%% Algorithm settings
+% Remove "end _X_" text
+\algtext*{EndLoop}
+% \algtext*{EndFor}
+\algtext*{EndIf}
+\algtext*{EndFunction}

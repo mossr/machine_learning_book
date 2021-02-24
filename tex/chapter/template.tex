@@ -1,0 +1,216 @@
+\chapter{Template}
+
+\section{Using Julia}
+
+In this section we provide some examples of how Julia algorithms can be typeset, tested, etc.
+We begin with a Julia algorithm, \cref{alg:sample_function}.
+We use our custom \texttt{algorithm} environment with a pythontex \texttt{juliaverbatim} environment inside to typeset the algorithm.
+A caption provides some additional information, and shows up in the margin.
+
+\begin{algorithm}
+\begin{juliaverbatim}
+function sample_function(x, a)
+	if x > a
+		return log(x)
+	else
+		return x + log(a) - a
+	end
+end
+\end{juliaverbatim}
+\caption{
+	\label{alg:sample_function}
+	A sample function that takes in an evaluation scalar \jlv{x} and a scalar parameter \jlv{a}.
+}
+\end{algorithm}
+
+We can add a test for our algorithm in the source code.
+This test does not show up when you compile.
+You can run all tests by executing \texttt{jl runtests.jl}.
+
+\begin{juliatest}
+let
+	@test isapprox(sample_function(1.0, 2), -0.30685, atol=1e-5)
+	@test isapprox(sample_function(1.0, 3), -0.90139, atol=1e-5)
+	@test isapprox(sample_function(1.5, 2), 0.19315, atol=1e-5)
+end
+\end{juliatest}
+
+The code can be executed when creating figures.
+\Cref{fig:sample_function} is a standard inline figure that executes Julia code using \jlpkg{PGFPlots} to produce a \TeX file in the \texttt{\\fig} directory.
+This file is then compiled into the PDF.
+
+
+\begin{figure}
+	\begin{jlcode}
+	p = let
+		xs = collect(range(0.0,stop=10.0,length=101))
+		plots = Plots.Plot[]
+		for a in [1,2,3,5]
+			push!(plots,
+				Plots.Linear(xs, [sample_function(x, a) for x in xs],
+				   style="solid, thick, mark=none", legendentry="parameter \$a = $a\$"))
+		end
+		Axis(plots, width="8cm", height="5cm", xlabel=L"x", ylabel="sample function output",
+					style="cycle list name = pastelcolors",
+		 		    legendPos="outer north east")
+	end
+	plot(p)
+	\end{jlcode}
+	\begin{center}
+		\plot{fig/sample_function}
+	\end{center}
+	\caption{
+		\label{fig:sample_function}
+		Curves obtained when using \jlv{sample_function} for several different values of \jlv{a}.
+	}
+\end{figure}
+
+\pagebreak
+
+Of course, there is nothing stopping you from inserting tikzpictures directly, as shown in \cref{fig:sample_tikzpicture}.
+\begin{figure}
+	\centering
+	\begin{tikzpicture}[x=1cm, y=1cm]
+		\draw[pastelBlue] (0,0) rectangle (2,2);
+		\fill[pastelRed]  (3,-1) rectangle ++(2,1);
+		\fill[pastelPurple]  (7,0.5) circle (0.5);
+		\node[anchor=south] at (4,0) {red rectangle};
+	\end{tikzpicture}
+	\caption{
+		\label{fig:sample_tikzpicture}
+		A figure made using a \texttt{tikzpicture} environment.
+	}
+\end{figure}
+
+Figures can also be placed in the margins, as with \cref{fig:sample_marginfigure}.
+\begin{marginfigure}
+	\begin{jlcode}
+	p = let
+		Axis(Plots.Linear(x->sin(x) + x, (0,10), style="solid, pastelBlue, mark=none"),
+			 width="5cm", height="5cm", xlabel=L"x", ylabel=L"f(x)")
+	end
+	plot(p)
+	\end{jlcode}
+	\begin{center}
+		\plot{fig/sample_marginfigure}
+	\end{center}
+	\caption{
+		\label{fig:sample_marginfigure}
+		A \texttt{marginfigure} shows up in the margin.
+	}
+\end{marginfigure}
+
+
+The \texttt{pythontex} package also supports the \texttt{juliaconsole} environment, as shown below.
+These environments act like the julia REPL, showing code as it is entered and executed.
+\begin{juliaconsole}
+x = 5
+y = 7.5
+x^y
+\end{juliaconsole}
+
+\section{Custom Environments}
+
+We created two custom environments in addition to the \texttt{algorithm} environment when writing \textit{Algorithms for Optimization}.
+The \texttt{example} environment creates an isolated section in a light-gray box with its own caption.
+
+\begin{example}
+	An example of the \texttt{example} environment.
+	Place anything you want here, including figures.
+	\caption{
+		\label{ex:sample_example}
+		An example \texttt{example}.
+	}
+\end{example}
+
+We also have \texttt{question} and \texttt{solution} environments, typically used at the end of each chapter.
+The solutions can automatically be placed at the end of the book by using \texttt{solutionappendix}.
+
+\begin{question}
+	What is the meaning of life?
+\end{question}
+\begin{solution}
+	The meaning of life is \num{42}.
+\end{solution}
+
+\section{Math Notation}
+
+\textit{Algorithms for Optimization} uses lowercase characters with bold face for vectors, such as $\vect x$, and uppercase characters with bold face for matrices, such as $\mat \Sigma$.
+Scalars are lowercase with normal face, such as $\lambda$.
+
+The contents of vectors and matrices can be typeset using \texttt{bmatrix}:
+\begin{equation}
+	\begin{bmatrix}x_1 \\ x_2\end{bmatrix} = \\
+	\begin{bmatrix}
+		\Sigma_{11} & \Sigma_{12} \\
+		\Sigma_{21} & \Sigma_{22}
+	\end{bmatrix}^{-1}
+	\begin{bmatrix}y_1 \\ y_2\end{bmatrix}
+\end{equation}
+
+We often write out vectors horizontally in order to save space.
+In these cases, we use comma-separate entries:
+\begin{equation}
+	\vect x = [x_1, x_2]
+\end{equation}
+
+We construct an optimization problem as follows:
+\begin{equation}
+	\begin{aligned}
+        \minimize_{\vect x} & & f(\vect x)\\
+        \subjectto & & g(\vect x) \leq \vect 0 \\
+        		   & & h(\vect x) = \vect 0
+    \end{aligned}
+\end{equation}
+
+See \texttt{tufte\_algorithm\_book.cls} for some additional math utilities, such as $\gaussian{\mu}{\nu}$ and $\card{\mathcal{A}}$.
+
+\section{Code Replacement}
+
+Sometimes the function you want typeset is almost, but not quite, the function that you want to also execute or test.
+For example, you may want to inject an extra line to store data into a global variable, or you may wish to replace a particular function with a specialized version.
+
+For such cases we have a simple replacement feature built into the \texttt{pull\_julia\_code} script.
+The script searches for \jlv{"REPLACE \(.*\) \(.*\)"} in the lines between the beginning of the \texttt{algorithm} environment and the beginning of the \texttt{juliaverbatim} environment.
+It will then match the string between the first parentheses and replace it with the string between the second parentheses when exporting the code.
+The code block will still be typeset with exactly what is inside the environment --- it is only the exported code that is changed.
+
+This feature was intended to be used sparingly.
+
+\begin{algorithm}
+% REPLACE (return x^2) (return sin(x))
+\begin{juliaverbatim}
+function replacement_example(x)
+	return x^2
+end
+\end{juliaverbatim}
+\caption{
+	\label{alg:replacement_example}
+	A sample typeset algorithm whose exported code differs from what is typeset.
+	Here the \jlv{x^2} will be replaced with \jlv{sin(x)}.
+}
+\end{algorithm}
+
+\begin{marginfigure}[6cm]
+	\begin{jlcode}
+	p = let
+		Axis(Plots.Linear(replacement_example, (0,10), style="solid, pastelBlue, mark=none"),
+			 width="5cm", height="5cm", xlabel=L"x", ylabel=L"f(x)")
+	end
+	plot(p)
+	\end{jlcode}
+	\begin{center}
+		\plot{fig/replacement_example}
+	\end{center}
+	\caption{
+		\label{fig:sample_marginfigure}
+		We find that when using \cref{alg:replacement_example}, we actually get $f(x) = \sin(x)$ due to the replacement going on under the hood.
+	}
+\end{marginfigure}
+
+\section{Conclusion}
+
+That is more or less everything you need in order to get started writing your own textbook with the \texttt{tufte\_algorithm\_book} style.
+We hope you find it useful.
+
+If you have any questions or find improvements, please create issues on our GitHub repo: \url{https://github.com/sisl/textbook_template}.

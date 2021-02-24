@@ -1,0 +1,1490 @@
+% https://stanford-cs221.github.io/spring2020/lectures/index.html#include=learning2.js
+
+\chapter{Machine Learning II} % (fold)
+\label{cha:machine_learning_ii}
+
+\marginnote{From CS221 Spring 2020, Percy Liang, Chelsea Finn \& Nima Anari, Stanford University.}
+
+Recall from last chapter that learning is the process of taking training data and turning it into a model (predictor).
+% 
+Last chapter, we started by studying the predictor $f$,
+concerning ourselves with linear predictors based on the score $\w \cdot \phi(x)$,
+where $\w$ is the weight vector we wish to learn and $\phi$
+is the feature extractor that maps an input $x$ to some feature vector $\phi(x) \in \R^d$,
+turning something that is domain-specific (images, text) into a mathematical object.
+% 
+Then we looked at how to learn such a predictor by formulating an optimization problem
+and developing an algorithm to solve that problem.
+% 
+Recall that the optimization problem was to minimize the training loss, which is the average loss over all the training examples.
+
+\begin{gather*}		
+	\TrainLoss(\vec{w}) = \frac{1}{|\Dtrain|} \sum_{(x,y) \in \Dtrain} \operatorname{Loss}(x,y,\vec{w})\\
+	\minimize_{\vec{w} \in \mathbb{R}^d} \TrainLoss(\vec{w})
+\end{gather*}
+% TODO: Plots.
+
+The actual loss function depends on what we're trying to accomplish.
+Generally, the loss function takes the score $\w\cdot\phi(x)$,
+compares it with the correct output $y$ to form either the residual (for regression)
+or the margin (for classification).
+% 
+Regression losses are smallest when the residual is close to zero.
+Classification losses are smallest when the margin is large.
+Which loss function we choose depends on the desired properties.
+For example, the absolute deviation loss for regression is robust against outliers.
+The logistic loss for classification never relents in encouraging large margin.
+
+\begin{example}
+	\begin{center}
+		\begin{tabular}{lll}
+			$\phi(x)$ & $y$ & $\Loss(x,y,\w) = (\w \cdot \phi(x)-y)^2$\\
+			$[1,0]$ & $2$ & $(w_1 - 2)^2$\\
+			$[1,0]$ & $4$ & $(w_1 - 4)^2$\\
+			$[0,1]$ & $-1$ & $(w_1 - (-1))^2$\\
+		\end{tabular}
+	\end{center}
+
+	\br
+
+	\[
+		\TrainLoss(\w) = \frac{1}{3} ((w_1 - 2)^2 + (w_1 - 4)^2 + (w_2 - (-1))^2)
+	\]
+
+	Note that we've been talking about the loss on a single example,
+	and plotting it in 1D against the residual or the margin.
+	Recall that what we're actually optimizing is the training loss,
+	which sums over all data points.
+	To help visualize the connection between a single loss plot and the more general picture,
+	consider the simple example of linear regression on three data points:
+	$([1, 0], 2)$, $([1, 0], 4)$, and $([0, 1], -1)$,
+	where $\phi(x) = x$.
+
+	Let's try to draw the training loss, which is a function of $\w = [w_1, w_2]$.
+	Specifically, the training loss is $\frac{1}{3}((w_1 - 2)^2 + (w_1 - 4)^2 + (w_2 - (-1))^2)$.
+	The first two points contribute a quadratic term sensitive to $w_1$,
+	and the third point contributes a quadratic term sensitive to $w_2$.
+	When you combine them, you get a quadratic centered at $[3, -1]$.
+\end{example}
+
+\bparagraph{Review: Optimization Algorithms.} % (fold)
+\label{sub:review_optimization_algorithms}
+
+\begin{algorithm}[ht]
+  \caption{Gradient descent.}
+  % \label{alg:gd}
+  \begin{algorithmic}
+  \Function{GradientDescent}{$\Train, \nabla\TrainLoss$}  
+	\State Initialize $\vec{w}=[0,\ldots,0]$
+	\For{$t = 1,\ldots,T$}:
+		\State $\vec{w} \leftarrow \vec{w} - \eta \nabla_{\vec{w}}\TrainLoss(\vec{w})$
+	\EndFor
+  \EndFunction
+  \end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[ht]
+  \caption{Stochastic gradient descent.}
+  % \label{alg:gd}
+  \begin{algorithmic}
+  \Function{StochasticGradientDescent}{$\Train, \nabla\Loss$}  
+	\State Initialize $\vec{w}=[0,\ldots,0]$
+    \For{$t = 1,\ldots,T$}:
+		\For{$(x,y) \in \Dtrain$}:
+			\State $\w \leftarrow \w - \eta \nabla_{\w} \Loss(x, y, \w)$
+		\EndFor
+	\EndFor
+  \EndFunction
+  \end{algorithmic}
+\end{algorithm}
+
+Finally, we introduced two very simple algorithms to minimize the training loss,
+both based on iteratively computing the gradient of the objective with respect to the parameters $\w$ and stepping in the opposite direction of the gradient.
+Think about a ball at the current weight vector and rolling it down on the surface of the training loss objective.
+% 
+Gradient descent (GD) computes the gradient of the full training loss, which can be slow for large datasets.
+% 
+Stochastic gradient descent (SGD), which approximates the gradient of the training loss with the loss at a single example, generally takes less time.
+% 
+In both cases, one must be careful to set the step size $\eta$ properly (not too big, not too small).
+
+% subsection review_optimization_algorithms (end)
+
+\begin{example}
+	Can we obtain decision boundaries which are circles by using linear classifiers? 
+	The answer is \textbf{yes}.
+
+	This might seem paradoxical since we are only working with linear classifiers.
+	But as we will see later, \textit{linear} refers to the relationship between the
+	weight vector $\w$ and the prediction score (not the input $x$, which might not even be a real vector),
+	whereas the decision boundary refers to how the prediction varies as a function of $x$.
+
+	Advanced: Sometimes people might think that linear classifiers are not expressive,
+	and that you need neural networks to get expressive and non-linear classifiers.
+	This is false.
+	You can build arbitrarily expressive models with the machinery of linear classifiers (see kernel methods).
+	The advantages of neural networks are the computational benefits and the inductive bias that comes from the particular neural network architecture.
+\end{example}
+
+The first half of this chapter is about thinking about the feature extractor $\phi$. % DIFF: chapter
+Features are a critical part of machine learning which often do not get as much attention as they deserve.
+Ideally, they would be given to us by a domain expert,
+and all we (as machine learning people) have to do is to stick them into our learning algorithm.
+While one can get considerable mileage out of doing this,
+the interface between general-purpose machine learning and domain knowledge is often nuanced,
+so to be successful, it pays to understand this interface.
+
+In the second half of this chapter, we return to learning, % DIFF: chapter
+rip out the linear predictors that we had from before,
+and show how we can build more powerful neural network classifiers given the features that we extracted.
+
+\section{Features} % (fold)
+\label{sec:features}
+
+There are two component to classification, score (drives prediction):
+\[
+	\w \cdot \phi(x)
+\]
+\begin{itemize} % TODO: red and blue
+	\item Previous Chapter: \textbf{learning} chooses $\w$ via optimization.
+	\item This Chapter: \textbf{feature extraction} specifies $\phi(x)$ based on domain knowledge.
+\end{itemize}
+
+As a reminder, the prediction is driven by the score $\w \cdot \phi(x)$.
+In regression, we predict the score directly, and in binary classification, we predict the sign of the score.
+Both $\w$ and $\phi(x)$ play an important role in prediction.
+So far, we have fixed $\phi(x)$ and used learning to set $\w$.
+Now, we will explore how $\phi(x)$ affects the prediction.
+
+% section features (end)
+
+\pagebreak
+
+\subsection{Organization of Features} % (fold)
+\label{sub:organization_of_features}
+
+\textbf{Task:} Predict whether a string is an email address.
+
+\begin{align*}
+	\texttt{"abc@gmail.com"} \xrightarrow[\text{arbitrary!}]{\text{feature extractor}} \begin{bmatrix}
+	\texttt{length>10}: & 1\\
+	\texttt{fracOfAlpha}: & 0.85\\
+	\texttt{contains\_@}: & 1\\
+	\texttt{endsWith\_.com}: & 1\\
+	\texttt{endsWith\_.org}: & 0
+	\end{bmatrix}
+\end{align*}
+Which features to include? We need an organizational principle.
+% 
+How would we go about about creating good features?
+Here, we used our prior knowledge to define certain features (\texttt{contains\_@})
+which we believe are helpful for detecting email addresses.
+But this is ad-hoc: which strings should we include?
+We need a more systematic way to go about this.
+
+% subsection organization_of_features (end)
+
+\subsection{Feature Templates} % (fold)
+\label{sub:feature_templates}
+
+\begin{example}
+	\textbf{Definition: feature template (informal).} A \textit{feature template} is a group of features all computed in a similar way.
+\end{example}
+\noindent\textbf{Input:} $\texttt{"abc@gmail.com"}$, with some feature templates:
+\begin{itemize}
+	\item Length greather than $\underline{\phantom{--}}$
+	\item Last three characters equals $\underline{\phantom{--}}$
+	\item Contains character $\underline{\phantom{--}}$
+	\item Pixel intensity of position $\underline{\phantom{--}}$,$\underline{\phantom{--}}$
+\end{itemize}
+
+A useful organization principle is a \textit{feature template},
+which groups all the features which are computed in a similar way.
+(People often use the word "feature" when they really mean "feature template".)
+% 
+A feature template also allows us to define a set of related features
+(\texttt{contains\_@}, \texttt{contains\_a}, \texttt{contains\_b}).
+This reduces the amount of burden on the feature engineer
+since we don't need to know which particular characters are useful,
+but only that existence of certain single characters is a useful cue to look at.
+
+We can write each feature template as a English description with a blank (\_\_\_),
+which is to be filled in with an arbitrary string.
+Also note that feature templates are most natural for defining binary features,
+ones which take on value $1$ (true) or $0$ (false).
+% 
+Note that an isolated feature (fraction of alphanumeric characters) can be treated
+as a trivial feature template with no blanks to be filled.
+
+As another example, if $x$ is a $k \times k$ image, then $\{ \text{pixelIntensity}_{ij} : 1 \le i,j\le k \}$ is a feature template consisting of $k^2$ features,
+whose values are the pixel intensities at various positions of $x$.
+
+\begin{example}
+\bparagraph{Feature template example.} Last three characters equals \_\_\_
+\begin{align*}
+	\texttt{"abc@gmail.com"} \longrightarrow \begin{bmatrix}
+	\texttt{endsWith\_aaa}: & 0\\
+	\texttt{endsWith\_aab}: & 0\\
+	\ldots \\
+	\texttt{endsWith\_com}: & 1\\
+	\ldots \\
+	\texttt{endsWith\_zzz}: & 0
+	\end{bmatrix}
+\end{align*}
+This is an example of one feature template mapping onto a group of $m^3$ features,
+where $m$ ($26$ in this example) is the number of possible characters.
+\br\\
+\begin{exalgorithm}
+\begin{juliaverbatim}
+last_three_chars___(x, 𝚺='a':'z') = 
+	[endswith(x, a*b*c) for a in 𝚺, b in 𝚺, c in 𝚺]
+\end{juliaverbatim}
+\end{exalgorithm}
+\end{example}
+
+% subsection feature_templates (end)
+
+\subsection{Sparsity in Feature Vectors} % (fold)
+\label{sub:sparsity_in_feature_vectors}
+
+Innefficient to represent all the zeros.
+In general, a feature template corresponds to many features.
+It would be inefficient to represent all the features explicitly.
+Fortunately, the feature vectors are often \textit{sparse},
+meaning that most of the feature values are $0$.
+It is common for all but one of the features to be $0$.
+This is known as a \textit{one-hot representation} of a discrete value such as a character.
+\begin{example}
+\bparagraph{Feature template example.} Last character equals \_\_\_
+\begin{align*}
+	\texttt{"abc@gmail.com"} \longrightarrow \begin{bmatrix}
+	\texttt{endsWith\_a}: & 0\\
+	\texttt{endsWith\_b}: & 0\\
+	\texttt{endsWith\_c}: & 0\\
+	\ldots\\
+	\texttt{endsWith\_z}: & 0
+	\end{bmatrix}
+\end{align*}
+\br\\
+\begin{exalgorithm}
+\begin{juliaverbatim}
+last_char_equals___(x, 𝚺='a':'z') = [endswith(x, c) for c in 𝚺]
+\end{juliaverbatim}
+\end{exalgorithm}
+% last_char_equals___(x) = [endswith(x, c) for c in 'a':'z']
+\end{example}
+
+% subsection sparsity_in_feature_vectors (end)
+
+\subsection{Feature Vector Representation} % (fold)
+\label{sub:feature_vector_representation}
+Let's now talk a bit more about implementation.
+There are two common ways to define features: using arrays or using maps.
+% 
+\textit{Arrays} assume a fixed ordering of the features and represent the feature values as an array.
+This representation is appropriate when the number of nonzeros is significant (the features are dense).
+Arrays are especially efficient in terms of space and speed (and you can take advantage of GPUs).
+In computer vision applications, features (e.g., the pixel intensity features)
+are generally dense, so array representation is more common.
+\begin{align*}
+\begin{bmatrix}
+	\texttt{fracOfAlpha}: & 0.85\\
+	\texttt{contains\_a}: & 0\\
+	\ldots\\
+	\texttt{endsWith\_@}: & 1\\
+	\ldots
+\end{bmatrix}
+\end{align*}
+\begin{itemize}
+	\item Array representation (good for dense features):
+	\[
+		[0.85, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0]
+	\]
+	\item Map representation (good for sparse features):
+	\[
+		\{\texttt{"fracOfAlpha"}: 0.85, \texttt{"contains\_@"}: 1\}
+	\]
+\end{itemize}
+
+However, when we have sparsity (few nonzeros),
+it is typically more efficient to represent the feature vector as a \textit{map} from strings to doubles
+rather than a fixed-size array of doubles.
+The features not in the map implicitly have a default value of zero.
+This sparse representation is very useful in natural language processing,
+and is what allows us to work effectively over trillions of features.
+In Python, one would define a feature vector $\phi(x)$ as the dictionary \texttt{"endsWith\_"+x[-3:]: 1}.
+Maps do incur extra overhead compared to arrays, and therefore maps are much slower when the features are not sparse.
+
+Finally, it is important to be clear when describing features.
+Saying "length" might mean that there is one feature whose value is the length of $x$
+or that there could be a feature template "length is equal to \_\_\_".
+These two encodings of the same information can have a drastic impact on prediction accuracy when using a linear predictor,
+as we'll see later.
+
+% subsection feature_vector_representation (end)
+
+\subsection{Hypothesis Class} % (fold)
+\label{sub:hypothesis_class}
+Having discussed how feature templates can be used to organize groups of features and allow us to leverage sparsity,
+let us further study how features impact prediction.
+% 
+The key notion is that of a \textit{hypothesis class},
+which is the set of all possible predictors that you can get by varying the weight vector $\w$.
+Thus, the feature extractor $\phi$ specifies a hypothesis class $\mathcal{F}$.
+This allows us to take data and learning out of the picture.
+
+\bparagraph{Predictor:} $f_{\w}(x) = \w \cdot \phi(x) \quad\text{ or }\quad \operatorname{sign}(\w \cdot \phi(x))$
+
+
+\begin{example}
+	\textbf{Definition: hypothesis class.} A \textit{hypothesis class} is the set of possible predictors with a fixed $\phi(x)$ and varying $\w$:
+	\[
+		\mathcal{F} = \{ f_{\w}: \w \in \mathbb{R}^d \}
+	\]
+\end{example}
+
+
+% subsection hypothesis_class (end)
+
+% TODO: feature extractor + learning diagram (slide 30)
+
+
+\subsection{Feature Extration and Learning} % (fold)
+\label{sub:feature_extration_and_learning}
+
+Stepping back, we can see the two stages more clearly.
+First, we perform feature extraction (given domain knowledge) to specify a hypothesis class $\mathcal{F}$.
+Second, we perform learning (given training data) to obtain a particular predictor $f_{\w} \in \mathcal{F}$.
+% 
+\begin{itemize}
+	\item Feature extraction: set $\mathcal{F}$ based on domain knowledge
+	\item Learning: set $f_{\w} \in \mathcal{F}$ based on data
+\end{itemize}
+% 
+Note that if the hypothesis class doesn't contain any good predictors, then no amount of learning can help.
+So the question when extracting features is really whether they are powerful enough to \textit{express} predictors which are good.
+It's okay and expected that $\mathcal{F}$ will contain a bunch of bad ones as well.
+% 
+Later, we'll see reasons for keeping the hypothesis class small (both for computational and statistical reasons),
+because we can't get the optimal $\w$ for any feature extractor $\phi$ we choose.
+
+
+% subsection feature_extration_and_learning (end)
+
+\begin{example}
+	\noindent\textbf{Regression:} $x \in \mathbb{R}, y \in \mathbb{R}$
+
+	\br
+
+	\noindent\textbf{Linear functions:}
+	\begin{gather*}		
+		\phi(x)=x \\
+		\mathcal{F}_1 = \{x \mapsto w_1 x: w_2 \in \mathbb{R}\}
+	\end{gather*}
+	\noindent\textbf{Quadratic functions:}
+	\begin{gather*}
+		\phi(x)=[x,x^2]\\
+		\mathcal{F}_2 = \{x \mapsto w_1 x + w_2 x^2 : w_1 \in \mathbb{R}, w_2 \in \mathbb{R}\}
+	\end{gather*}
+
+	\caption{
+		\label{ex:beyond}
+		Beyond linear functions.
+	}
+\end{example}
+Given a fixed feature extractor $\phi$,
+let us consider the space of all predictors $f_{\w}$ obtained by sweeping $\w$ over all possible values.
+% 
+If we use $\phi(x) = x$, then we get linear functions that go through the origin.
+However, we want to have functions that "bend" (or are not monotonic).
+For example, if we want to predict someone's health given his or her body temperature,
+there is a sweet spot temperature (37 C) where the health is optimal;
+both higher and lower values should cause the health to decline.
+% 
+If we use $\phi(x) = [x, x^2]$, then we get quadratic functions that go through the origin,
+which are a strict superset of the linear functions,
+and therefore are strictly more expressive.
+
+
+\begin{example}
+	\noindent\textbf{Regression:} $x \in \mathbb{R}, y \in \mathbb{R}$
+
+	\br
+
+	\noindent\textbf{Piecewise constant functions:}
+	\begin{gather*}
+		\phi(x) = \left[\mathbb{1}[0 < x \le 1], \mathbb{1}[1 < x \le 2], \dots \right]\\
+		\mathcal{F}_3 = \left\{ x \mapsto \sum_{j=1}^{10} w_j \mathbb{1}[j - 1 < x \le j] : \w \in \mathbb{R}^{10} \right\}
+	\end{gather*}
+
+	\caption{
+		\label{ex:regression_pw_cont}
+		Even more flexible functions
+	}
+\end{example}
+
+However, even quadratic functions can be limiting because they have to rise and fall in a certain (parabolic) way.
+What if we wanted a more flexible, freestyle approach?
+% 
+We can create piecewise constant functions by defining features that "fire" (are 1) on particular regions of the input (e.g., $1 < x \le 2$).
+Each feature gets associated with its own weight, which in this case corresponds to the desired function value in that region.
+% 
+Thus by varying the weight vector, we get piecewise constant functions with a particular discretization level.
+We can increase or decrease the discretization level as we need.
+
+Advanced: what happens if $x$ were not a scalar, but a $d$-dimensional vector?
+We could perform discretization in $\mathbb{R}^d$,
+but the number of features grows exponentially in $d$,
+which leads to a phenomenon called the curse of dimensionality.
+
+
+\subsection{Linearity}
+Wait a minute...how were we able to get non-linear predictions using linear predictors?
+% 
+It is important to remember that for linear predictors, it is the score $\w \cdot \phi(x)$ that is linear in $\w$ and $\phi(x)$ (read it off directly from the formula).
+In particular, the score is not linear in $x$ (it sometimes doesn't even make sense because $x$ need not be a vector at all---it could be a string or a PDF file.
+Also, neither the predictor $f_{\w}$ (unless we're doing linear regression) nor the loss function $\TrainLoss(\w)$ are linear in anything.
+ % Linear in What?
+For the prediction driven by score $\w \cdot \phi(x)$:
+\begin{center}
+  \begin{tabular}{ll}
+    Linear in $\w$? & Yes\\
+    Linear in $\phi(x)$? & Yes\\
+    Linear in $x$? & No! ($x$ not necessarily even a vector)
+  \end{tabular}
+\end{center}
+
+\begin{example}
+  \textbf{Key idea: non-linearity.}
+  \begin{itemize}
+    \item Predictors $f_{\w}(x)$ can be expressive \textit{non-linear} functions and decision boundaries of $x$.
+    \item Score $\w \cdot \phi(x)$ is \textit{linear} function of $\w$, which permits efficient learning.
+  \end{itemize}
+\end{example}
+
+
+The significance is as follows: From the feature extraction viewpoint, we can define arbitrary features that yield very \textit{non-linear} functions in $x$.
+From the learning viewpoint (only looking at $\phi(x)$, not $x$),
+\textit{linearity} plays an important role in being able to optimize the weights efficiently (as it leads to convex optimization problems).
+
+% TODO: graph.
+
+
+
+\subsection{Geometric viewpoint}
+\[
+	\phi(x) = [1, x_1, x_2, x_1^2 + x_2^2]
+\]
+How to relate \textit{non-linear} decision boundary in $x$ space with \textit{linear} decision boundary in $\phi(x)$ space?
+% 
+Let's try to understand the relationship between the non-linearity in $x$ and linearity in $\phi(x).$
+We consider binary classification where our input is $x = [x_1, x_2] \in \R^2$ a point on the plane.
+With the quadratic features $\phi(x)$, we can carve out the decision boundary corresponding to an ellipse
+(think about the formula for an ellipse and break it down into monomials).
+% 
+We can now look at the feature vectors $\phi(x)$, which include an extra dimension.
+In this 3D space, a linear predictor (defined by the hyperplane)
+actually corresponds to the non-linear predictor in the original $2$D space.
+
+\begin{example}
+    \noindent \textbf{Input $x$}:
+    \[\text{two consecutive messages in a chat}\]
+    \noindent \textbf{Output $y \in \{ +1, -1 \}$}:
+    \[\text{whether the second message is a response to the first}\]
+    Recall, feature extractor $\phi$ should pick out properties of $x$ that might be useful for prediction of $y$.
+    \caption{
+	    An example task: detecting responses.
+	}
+\end{example}
+
+Let's apply what you've learned about feature extraction to a concrete problem.
+The motivation here is that messaging platforms often just show a single stream of messages,
+when there is generally a grouping of messages into coherent conversations.
+How can we build a classifier that can group messages automatically?
+We can formulate this as a binary classification problem where we look at two messages and determine whether or not these two are part of the same conversation. % DIFF: "or not" wording.
+
+\begin{example}	
+\bparagraph{Question.} What feature templates would you use for predicting whether the second message is a response to the first?
+\begin{itemize}
+	\item time elapsed
+	\item time elapsed is between \_\_\_ and \_\_\_
+	\item first message contains \_\_\_
+	\item second message contains \_\_\_
+	\item two messages both contain \_\_\_
+	\item two messages have \_\_\_ common words
+\end{itemize}
+\end{example}
+
+\subsection{Summary} % (fold)
+\label{sub:summary}
+
+\begin{itemize}
+  \item \textbf{Feature templates:} organize related (sparse) features
+  \item \textbf{Hypothesis class:} defined by features (what is possible)
+  \item \textbf{Linear classifiers:} can produce non-linear decision boundaries
+\end{itemize}
+
+% subsection summary (end)
+
+
+\section{Neural Networks} % (fold)
+\label{sec:neural_networks}
+
+What we've shown so far is that by being mildly clever with choosing the feature extractor $\phi$,
+we can actually get quite a bit of mileage out of our so-called linear predictors.
+% 
+However, sometimes we don't know what features are good to use, either because the prediction task is non-intuitive
+or we don't have time to figure out which features are suitable.
+Sometimes, we think we might know what features are good, but then it turns out that they aren't (this happens a lot!).
+% 
+In the spirit of machine learning,
+we'd like to automate things as much as possible.
+In this context, it means creating algorithms that can take whatever crude features we have and turn them into refined predictions,
+thereby shifting the burden off feature extraction and moving it to learning.
+
+\textit{Neural networks} have been around for many decades,
+but they fell out of favor because they were difficult to train.
+In the last decade, there has been a huge resurgence of interest in neural networks
+since they perform so well and training seems to not be such an issue when you have tons of data and compute.
+% 
+In a sense, neural networks allow one to automatically learn the features of a linear classifier which are geared towards the desired task,
+rather than specifying them all by hand.
+
+% section neural_networks (end)
+
+% \subsection{Motivation}
+\begin{example}
+  As a motivating example, consider the problem of predicting whether two cars at positions $x_1$ and $x_2$ are going to collide.
+  Suppose the true output is $1$ (safe) whenever the cars are separated by a distance of at least $1$.
+  Clearly, this the decision is not linear.
+  \br
+
+  \noindent\textbf{Input:} position of two oncoming cars $x = [x_1, x_2]$
+	
+  \noindent\textbf{Output:} whether safe ($y = +1$) or collide ($y = -1$)
+
+  \noindent\textbf{True function:} safe if cars sufficiently far
+  \[y = \sign(|x_1 - x_2| - 1)\]
+
+  \noindent\textbf{Examples:}
+  \begin{tabular}{ll}
+    $x$        & $y$\\
+    $[1, 3]$   & $+1$\\
+    $[3, 1]$   & $+1$\\
+    $[1, 0.5]$ & $-1$
+  \end{tabular}
+
+
+  \caption{
+	Predicting car collision.
+  }
+\end{example}
+
+% https://stanford-cs221.github.io/spring2020/lectures/index.html#include=learning2.js&slideId=decomposing-the-problem&level=3
+
+% https://github.com/stanford-cs221/autumn2019/blob/gh-pages/lectures/learning2.js#L324
+
+
+\subsection{Decomposing the problem}
+The intuition is to break up the problem into two subproblems,
+%
+which test if car $1$ (or car $2$) is to the far right.
+%
+Given these two binary values $h_1,h_2$, we can declare safety if at least one of them is true.
+%%
+\begin{itemize}
+	\item Test if car $1$ is far right of car $2$: $h_1 = \1[x_1 - x_2 \ge 1]$
+	\item Test if car $2$ is far right of car $1$: $h_2 = \1[x_2 - x_1 \ge 1]$
+	\item Safe if at least one is true: $y = \sign(h_1 + h_2)$
+\end{itemize}
+\begin{table}[!h]
+\centering
+% \caption{\label{}}
+\begin{tabular}{llll}
+    $x$ & $h_1$ & $h_2$ & $y$\\
+    $[1, 3]$ & $0$ & $1$ & $+1$\\
+    $[3, 1]$ & $1$ & $0$ & $+1$\\
+    $[1, 0.5]$ & $0$ & $0$ & $-1$\\
+\end{tabular}
+\end{table}
+
+
+\subsection{Learning strategy}
+Having written $y$ in a specific way, let us try to generalize to a family of predictors (this seems to be a recurring theme).
+%
+We can define $\v_1 = [-1, 1, -1]$ and $\v_2 = [-1, -1, 1]$ and $w_1=w_2=1$ to accomplish this.
+%
+At a high-level, we have defined two intermediate subproblems, that of predicting $h_1$ and $h_2$.
+%
+These two values are hidden in the sense that they are not specified to be anything.
+%
+They just need to be set in a way such that $y$ is linearly predictable from them.
+Define: $\phi(x) = [1, x_1, x_2]$.
+% 
+Intermediate hidden subproblems:
+\begin{align*}
+h_1 &= \1[x_1 - x_2 \ge 1]\\
+    &= \1[\red{\v_1} \cdot \phi(x) \ge 0] \qquad \red{\v_1} = [-1, +1, -1]\\
+h_2 &= \1[x_2 - x_1 \ge 1]\\
+    &= \1[\red{\v_2} \cdot \phi(x) \ge 0] \qquad \red{\v_2} = [-1, -1, +1]	
+\end{align*}
+Final prediction:
+\begin{align*}
+	y &= \sign(h_1 + h_2)\\
+    f_{\red{\V, \w}}(x) &= \sign(\red{w_1} h_1 + \red{w_2} h_2) \qquad \red{\w} = [1, 1]
+\end{align*}
+
+
+\begin{example}
+\bparagraph{Key idea: joint learning.}
+Goal is to learn both hidden subproblems $\red{\V = (\v_1, \v_2)}$ and combination weights $\red{\w = [w_1, w_2]}$.
+\end{example}
+
+
+
+\subsection{Gradients}
+If we try to train the weights $\v_1,\v_2,w_1,w_2$, we will immediately notice a problem:
+%
+the gradient of $h_1$ with respect to $\v_1$ is always zero because of the hard thresholding function.
+%
+Therefore, we define a function \textit{logistic function} $\sigma(z)$, which looks roughly like the step function $\1[z \ge 0]$,
+%
+but has non-zero gradients everywhere.
+%
+One thing to bear in mind is that even though the gradients are non-zero, they can be quite small when $|z|$ is large.
+%
+This is what makes optimizing neural networks hard.
+%%
+
+Problem: gradient of $h_1$ with respect to $\v_1$ is $0$:
+$h_1 = \1[\red{\v_1} \cdot \phi(x) \ge 0]$. 
+Solution:
+$h_1 = \sigma(\red{\v_1} \cdot \phi(x))$.
+
+\begin{example}
+\bparagraph{Definition: logistic function.}
+The logistic function maps $(-\,\infty, \infty)$ to $[0, 1]$:
+\begin{align*}
+	\sigma(z) &= (1 + e^{-z})^{-1} = \frac{1}{1 + e^{-z}}\\
+	\sigma^\prime(z) &= \sigma(z) (1 - \sigma(z)) \tag{derivative}
+\end{align*}
+\end{example}
+\begin{algorithm}
+\begin{juliaverbatim}
+σ(z) = 1/(1 + exp(-z))
+σ′(z) = σ(z)*(1 - σ(z))
+\end{juliaverbatim}
+\caption{\label{alg:sigmoid} The logistic function \jlv{σ} and its derivative \jlv{σ′}.}
+\end{algorithm}
+
+
+\subsection{Linear functions}
+Let's try to visualize the functions.
+%
+Recall that a linear function takes the input $\phi(x) \in \R^d$ and directly take the dot product with the weight vector $\w$ to form the score,
+%
+the basis for prediction in both binary classification and regression.
+%%
+% 
+% Linear functions, output: $\text{score} = \red{\w} \cdot \phi(x)$
+For linear functions, the output is the $\text{score} = \red{\w} \cdot \phi(x)$:
+\begin{figure}
+\begin{center}
+\begin{tikzpicture}
+	\node (phi2) [nnnode, label=left:{$\phi(x)_2$}] {};
+	\node (phi1) [nnnode, above=2mm of phi2, label=left:{$\phi(x)_1$}] {};
+	\node (phi3) [nnnode, below=2mm of phi2, label=left:{$\phi(x)_3$}] {};
+
+	\node (score) [nnnode, right=15mm of phi2, label=right:{score}] {};
+
+	\draw[->] (phi1) -- (score) node [midway, yshift=7pt] {$\darkred{\w}$};
+	\draw[->] (phi2) -- (score);
+	\draw[->] (phi3) -- (score);
+\end{tikzpicture}
+\end{center}
+\caption{
+	\label{fig:linear}
+	A linear function with $\phi(x) \in \R^3$.
+}
+\end{figure}
+
+
+\subsection{Neural networks}
+A (one-layer) neural network first maps an input $\phi(x) \in \R^d$ onto a hidden \textit{intermediate representation} $\h \in \R^k$,
+%
+which in turn is mapped to the score via a linear function.
+%
+Specifically, let $k$ be the number of hidden units.
+%
+For each hidden unit $j = 1, \dots, k$, we have a weight vector $\v_j \in \R^d$,
+%
+which is used to determine the value of the hidden node $h_j \in \R$ (also called the \textit{activation})
+%
+according to $h_j = \sigma(\v_j \cdot \phi(x))$, where $\sigma$ is the activation function.
+%
+The activation function can be a number of different things, but its main property is that it is a non-linear function.
+%
+Let $\h = [h_1, \dots, h_k]$ be the vector of activations.
+%
+This activation vector is now combined with another weight vector $\w \in \R^k$ to produce the final score.
+%
+The logistic function is an instance of an \textit{activation function},
+%
+and is the classic one that was used in the past.
+%
+These days, most people use a \textit{rectifier} function, commonly known as a \textit{rectified linear unit} (ReLU),\marginnote{\jlv{ReLU(z) = max(z,0)}}
+%
+which is defined as $\text{ReLU}(z) = \max(z, 0)$.
+%
+The ReLU has two advantages: (i) its gradient doesn't vanish as $z$ grows, which makes it empirically easier to train;
+%
+and (ii) it only involves a max operation, which is computationally easier to compute than the exponential function.
+%%
+\begin{algorithm}
+\begin{juliaverbatim}
+function neural_network(x, 𝐕, 𝐰, φ, g::Function=σ)
+    𝐡 = map(𝐯ⱼ -> g(𝐯ⱼ ⋅ φ(x)), 𝐕)
+    𝐰 ⋅ 𝐡
+end
+
+function neural_network(x, 𝐕, 𝐰, φ, 𝐠::Vector)
+    𝐡 = map((g, 𝐯ⱼ) -> g(𝐯ⱼ ⋅ φ(x)), 𝐠, 𝐕)
+    𝐰 ⋅ 𝐡
+end
+\end{juliaverbatim}
+\caption{
+	\label{alg:neural_network}
+	A \textit{one-layer neural network} with activation function \jlv{g} defaulting to the logistic function, or a vector of activation functions \jlv{𝐠}.
+}
+\end{algorithm}
+
+For a neural network with one hidden layer, the intermediate hidden units are $h_j = \blue{\sigma}(\red{\v_j} \cdot \phi(x))$ where $\blue{\sigma}(z) = (1 + e^{-z})^{-1}$, producing output $\text{score} = \red{\w} \cdot \h$:
+\begin{figure}
+\begin{center}
+\begin{tikzpicture}
+	\node (phi2) [nnnode, label=left:{$\phi(x)_2$}] {};
+	\node (phi1) [nnnode, above=2mm of phi2, label=left:{$\phi(x)_1$}] {};
+	\node (phi3) [nnnode, below=2mm of phi2, label=left:{$\phi(x)_3$}] {};
+
+	\node (hidden1) [nnnode, above right=0mm and 15mm of phi2, label=above:{$h_1$}] {$\darkblue{\sigma}$};
+	\node (hidden2) [nnnode, below right=0mm and 15mm of phi2, label=below:{$h_2$}] {$\darkblue{\sigma}$};
+
+	\node (score) [nnnode, right=30mm of phi2, label=above:{score}] {};
+
+	\draw[->] (phi1) -- (hidden1) node [midway, yshift=7pt] {$\darkred{\V}$};
+	\draw[->] (hidden1) -- (score) node [midway, yshift=7pt] {$\darkred{\w}$};
+	\draw[->] (phi1) -- (hidden2);
+	\draw[->] (phi2) -- (hidden1);
+	\draw[->] (phi2) -- (hidden2);
+	\draw[->] (phi3) -- (hidden1);
+	\draw[->] (phi3) -- (hidden2);
+	\draw[->] (hidden1) -- (score);
+	\draw[->] (hidden2) -- (score);
+\end{tikzpicture}
+\end{center}
+\caption{
+	\label{fig:nn}
+	A \textit{one-layer neural network} with $\phi(x) \in \R^3$ and $\h \in \R^2$ using the logistic activation function $\sigma$.
+}
+\end{figure}
+
+
+% \subsection{Neural networks}
+Interpretation: intermediate hidden units as learned features of a linear predictor.
+% 
+The noteworthy aspect here is that the activation vector $\h$ behaves a lot like our feature vector $\phi(x)$ that we were using for linear prediction.
+%
+The difference is that mapping from input $\phi(x)$ to $\h$ is learned automatically, not manually constructed (as was the case before).
+%
+Therefore, a neural network can be viewed as learning the features of a linear classifier.
+%
+Of course, the type of features that can be learned must be of the form $x \mapsto \sigma(\v_j \cdot \phi(x))$.
+%
+Even for deep neural networks, no matter now deep the neural network is, the top layer is always a linear function,
+%
+and the layers below can be interpreted as defining a (possibly very complex) feature map.
+%
+Whether this is a suitable form depends on the nature of the application.
+%
+Empirically, though, neural networks have been quite successful,
+%
+since learning the features from the data with the explicit objective of minimizing the loss can yield better features than ones which are manually crafted.
+%
+Since 2010, there have been some advances in getting neural networks to work, and they have become the state-of-the-art in many tasks.
+%
+For example, all the major companies (Google, Microsoft, IBM) all recently switched over to using neural networks for speech recognition.
+%
+In computer vision, (convolutional) neural networks are completely dominant in object recognition.
+%%
+
+
+\begin{example}
+\bparagraph{Key idea: feature learning.}
+\begin{itemize}
+	\item \textbf{Before:} apply linear predictor on manually specified features. % TYPO: "specified"
+		\[\phi(x)\]
+	\item \textbf{Now:} apply linear predictor on automatically learned features.
+		\[h(x) = [h_1(x), \dots, h_k(x)]\]
+\end{itemize}
+\end{example}
+
+
+
+\section{Efficient Gradients} % (fold)
+\label{sec:efficient_gradients}
+% DIFF: "Gradients without tears"
+
+
+% \subsection{Motivation: loss minimization}
+The main thing left to do for neural networks is to be able to train them.
+%
+Conceptually, this should be straightforward: just take the gradient and run SGD.
+%
+While this is true, computing the gradient, even though it is not hard,
+%
+can be quite tedious to do by hand.
+%%
+
+\bparagraph{Optimization problem.}
+\begin{gather*}
+    \displaystyle \minimize_{\V, \w} \TrainLoss(\V, \w)\\
+	\displaystyle \TrainLoss(\V, \w) = \frac1{|\Train|} \sum_{(x,y) \in \Train} \Loss(x, y, \V, \w)\\
+	\Loss(x, y, \V, \w) = (f_{\V, \w}(x) - y)^2\\ % DIFF: corrected order (convention)
+	\displaystyle f_{\V, \w}(x) = \sum_{j=1}^k w_j \sigma(\v_j \cdot \phi(x))
+\end{gather*}
+% \br\\
+% \begin{tabular}{l}
+%     $\displaystyle \minimize_{\V, \w} \TrainLoss(\V, \w)$\\
+%     \\
+%     $\displaystyle \TrainLoss(\V, \w) = \frac1{|\Train|} \sum_{(x,y) \in \Train} \Loss(x, y, \V, \w)$\\
+%     \\
+%     $\Loss(x, y, \V, \w) = (y - f_{\V, \w}(x))^2$\\
+%     \\
+%     $\displaystyle f_{\V, \w}(x) = \sum_{j=1}^k w_j \sigma(\v_j \cdot \phi(x))$\\
+%     \\
+% \end{tabular}
+
+\bparagraph{Goal.} compute the gradient: $\nabla_{\V,\w} \TrainLoss(\V, \w)$
+
+
+
+\subsection{Approach}
+Mathematically, just grind through the chain rule.
+% 
+But wext we visualize the computation using a \textit{computation graph}.
+% 
+We will illustrate a graphical way of organizing the computation of gradients,
+%
+which is built out of a few components.
+%
+This graphical approach will show the structure of the function
+%
+and will not only make gradients easy to compute,
+%
+but also shed more light onto the predictor and loss function.
+%
+In fact, these days if you use a package such as TensorFlow or PyTorch,
+%
+you can write down the expressions symbolically and the gradient is computed for you.
+%
+This is done essentially using the computational procedure that we will see.
+%%
+
+\bparagraph{Advantages:}
+\begin{itemize}
+\item Avoid long equations
+\item Reveal structure of computations (modularity, efficiency, dependencies) --- TensorFlow/PyTorch are built on this
+\end{itemize}
+
+
+
+
+\subsection{Functions as boxes}
+The first conceptual step is to think of functions as boxes that take a set of inputs and produces an output.
+%
+Then the partial derivatives (gradients if the input is vector-valued) are just a measure of sensitivity:
+%
+if we perturb $\text{in}_1$ by a small amount $\epsilon$, how much does the output $\text{out}$ change?
+%
+The answer is $\frac{\partial\text{out}}{\partial\text{in}_1} \cdot \epsilon$.
+%
+For convenience, we write the partial derivative on the edge connecting the input to the output.
+%%
+% 
+Partial derivatives (i.e. gradients): how much does the output change if an input changes?
+Example:
+\begin{align*}
+	2 \text{in}_1 + \text{in}_2 \text{in}_3 &= \text{out}\\
+	2 (\text{in}_1 + \red{\epsilon}) + \text{in}_2 \text{in}_3 &= \text{out} + \red{2 \epsilon}\\
+	2 \text{in}_1 + (\text{in}_2 + \red{\epsilon}) \text{in}_3 &= \text{out} + \red{\text{in}_3 \epsilon}	
+\end{align*}
+% TODO: computational graph (tikz) in Julia generated.
+
+\begin{marginfigure}
+\begin{tikzpicture}
+	\node (out) [func, label=left:{out}] {function};
+	\node (partial2) [partial, below of=out] {$\frac{\partial\text{out}}{\partial\text{in}_2}$};
+	\node (partial1) [partial, left of=partial2] {$\frac{\partial\text{out}}{\partial\text{in}_1}$};
+	\node (partial3) [partial, right of=partial2] {$\frac{\partial\text{out}}{\partial\text{in}_3}$};
+	\node (in2) [input, below of=partial2] {$\text{in}_2$};
+	\node (in1) [input, below of=partial1] {$\text{in}_1$};
+	\node (in3) [input, below of=partial3] {$\text{in}_3$};
+
+	\draw[-] (out) -- (partial2);
+	\draw[-] (partial2) --  (in2);
+
+	\draw[-] (out) -- (partial1);
+	\draw[-] (partial1) --  (in1);
+
+	\draw[-] (out) -- (partial3);
+	\draw[-] (partial3) --  (in3);
+\end{tikzpicture}
+\end{marginfigure}
+
+
+\subsection{Basic building blocks}
+Here are 5 examples of simple functions and their partial derivatives.
+%
+These should be familiar from basic calculus.
+%
+All we've done is present them in a visually more intuitive way.
+%
+But it turns out that these simple functions are all we need to build up many of the more complex
+%
+and potentially scarier looking functions that we'll encounter in machine learning.
+%%
+
+\begin{figure}[!t]
+\begin{minipage}{0.3\textwidth}
+\begin{center}
+\begin{tikzpicture}
+	\node (out) [func] {$+$};
+	\node (partial1) [partial, below left=2mm and -2mm of out] {$1$};
+	\node (partial2) [partial, below right=2mm and -2mm of out] {$1$};
+	\node (in1) [input, below left=2mm and -2mm of partial1] {$a$};
+	\node (in2) [input, below right=2mm and -2mm of partial2] {$b$};
+
+	\draw[-] (out) -- (partial1);
+	\draw[-] (partial1) --  (in1);
+
+	\draw[-] (out) -- (partial2);
+	\draw[-] (partial2) --  (in2);
+\end{tikzpicture}
+\end{center}
+\end{minipage}
+% 
+\begin{minipage}{0.3\textwidth}
+\begin{center}
+\begin{tikzpicture}
+	\node (out) [func] {$-$};
+	\node (partial1) [partial, below left=2mm and -2mm of out] {$1$};
+	\node (partial2) [partial, below right=2mm and -2mm of out] {$-1$};
+	\node (in1) [input, below left=2mm and -2mm of partial1] {$a$};
+	\node (in2) [input, below right=2mm and -2mm of partial2] {$b$};
+
+	\draw[-] (out) -- (partial1);
+	\draw[-] (partial1) --  (in1);
+
+	\draw[-] (out) -- (partial2);
+	\draw[-] (partial2) --  (in2);
+\end{tikzpicture}
+\end{center}
+\end{minipage}
+% 
+\begin{minipage}{0.3\textwidth}
+\begin{center}
+\begin{tikzpicture}
+	\node (out) [func] {$\cdot$};
+	\node (partial1) [partial, below left=2mm and -2mm of out] {$b$};
+	\node (partial2) [partial, below right=2mm and -2mm of out] {$a$};
+	\node (in1) [input, below left=2mm and -2mm of partial1] {$a$};
+	\node (in2) [input, below right=2mm and -2mm of partial2] {$b$};
+
+	\draw[-] (out) -- (partial1);
+	\draw[-] (partial1) --  (in1);
+
+	\draw[-] (out) -- (partial2);
+	\draw[-] (partial2) --  (in2);
+\end{tikzpicture}
+\end{center}
+\end{minipage}
+% 
+% 
+\begin{minipage}{0.1\textwidth}
+% filler
+\end{minipage}
+% 
+\begin{minipage}{0.6\textwidth}
+\begin{center}
+\begin{tikzpicture}
+	\node (out) [func] {$\max$};
+	\node (partial1) [partial, below left=2mm and -4mm of out] {$\1[a>b]$};
+	\node (partial2) [partial, below right=2mm and -4mm of out] {$\1[a<b]$};
+	\node (in1) [input, below left=2mm and -4mm of partial1] {$a$};
+	\node (in2) [input, below right=2mm and -4mm of partial2] {$b$};
+
+	\draw[-] (out) -- (partial1);
+	\draw[-] (partial1) --  (in1);
+
+	\draw[-] (out) -- (partial2);
+	\draw[-] (partial2) --  (in2);
+\end{tikzpicture}
+\end{center}
+\end{minipage}
+% 
+\begin{minipage}{0.1\textwidth}
+% \begin{center}
+\begin{tikzpicture}
+	\node (out) [func] {$\sigma$};
+	\node (partial1) [partial, below=2mm of out] {$\sigma(a)(1-\sigma(a))$};
+	\node (in1) [input, below=2mm of partial1] {$a$};
+
+	\draw[-] (out) -- (partial1);
+	\draw[-] (partial1) --  (in1);
+\end{tikzpicture}
+% \end{center}
+\end{minipage}
+\end{figure}
+
+
+% \pagebreak % subsection title was orphaned.
+
+\subsection{Composing functions}
+\begin{marginfigure}
+\begin{tikzpicture}
+	\node (out) [func, label=left:{out}] {$\text{function}_2$};
+	\node (partialout) [partial, below=2mm of out] {$\frac{\partial\text{out}}{\partial\text{mid}}$};
+
+	\node (mid) [func, below=2mm of partialout, label=left:{mid}] {$\text{function}_1$};
+	\node (partialmid) [partial, below=2mm of mid] {$\frac{\partial\text{mid}}{\partial\text{in}}$};
+
+	\node (in1) [input, below=2mm of partialmid] {in};
+
+	\draw[-] (out) -- (partialout);
+	\draw[-] (partialout) --  (mid);
+	\draw[-] (mid) --  (partialmid);
+	\draw[-] (partialmid) --  (in1);
+\end{tikzpicture}
+\br
+
+\br
+
+\noindent Chain rule:
+\[
+	\darkgreen{\frac{\partial \text{out}}{\partial \text{in}} = \frac{\partial \text{out}}{\partial \text{mid}} \frac{\partial \text{mid}}{\partial \text{in}}}
+\]
+\end{marginfigure}
+The second conceptual point is to think about \textit{composing}.
+%
+Graphically, this is very natural: the output of one function $f$ simply gets fed as the input into another function $g$.
+%
+Now how does $\textbf{in}$ affect $\textbf{out}$ (what is the partial derivative)?
+%
+The key idea is that the partial derivative \textit{decomposes} into a product of the two partial derivatives on the two edges.
+%
+You should recognize this is no more than the chain rule in graphical form.
+%
+More generally, the partial derivative of $y$ with respect to $x$ is simply the product of all the green expressions on the edges of the path connecting $x$ and $y$.
+%
+This visual intuition will help us better understand more complex functions, which we will turn to next.
+%%
+
+
+
+\subsection{Binary classification with hinge loss}
+Let us start with a simple example: the hinge loss for binary classification.
+%
+In red, we have highlighted the weights $\w$ with respect to which we want to take the derivative.
+%
+The central question is how small perturbations in $\w$ affect a change in the output (loss).
+%
+Intermediate nodes have been labeled with interpretable names (score, margin).
+%
+The actual gradient is the product of the edge-wise gradients from $\w$ to the loss output.
+%%
+
+\begin{example}
+\begin{center}
+\begin{tikzpicture}
+	\node (funcmax) [func, label=left:{loss}] {$\max$};
+	\node (in0) [input, below right=8mm and 12mm of funcmax] {$0$};
+
+	\node (funcminus) [func, below left=8mm and 10mm of funcmax] {$-$};
+	\node (in1) [input, below left=8mm and 10mm of funcminus] {$1$};
+
+	\node (funcdotmargin) [func, below right=8mm and 10mm of funcminus, label=left:{margin}] {$\cdot$};
+	\node (iny) [input, below right=8mm and 10mm of funcdotmargin] {$y$};
+
+	\node (funcdotscore) [func, below left=8mm and 10mm of funcdotmargin, label=left:{score}] {$\cdot$};
+	\node (inphi) [input, below right=8mm and 10mm of funcdotscore] {$\phi(x)$};
+	\node (inw) [input, below left=8mm and 10mm of funcdotscore] {$\darkred{\w}$};
+
+	\draw[-] (funcmax) -- (in0);
+	\draw[-] (funcmax) -- (funcminus) node [midway, fill=shadecolor] {\footnotesize$\darkgreen{\1[1-\text{margin}>0]}$};
+
+	\draw[-] (funcminus) -- (in1);
+	\draw[-] (funcminus) -- (funcdotmargin) node [midway, fill=shadecolor] {\footnotesize$\darkgreen{-1}$};
+
+	\draw[-] (funcdotmargin) -- (iny) {};
+	\draw[-] (funcdotmargin) -- (funcdotscore) node [midway, fill=shadecolor] {\footnotesize$\darkgreen{y}$};
+
+	\draw[-] (funcdotscore) -- (inphi) {};
+	\draw[-] (funcdotscore) -- (inw) node [midway, fill=shadecolor] {\footnotesize$\darkgreen{\phi(x)}$};
+\end{tikzpicture}
+\end{center}
+\br
+
+\bparagraph{Gradient with respect to $\darkred{\w}$.}
+For the hinge loss
+\[
+	\Loss(x, y, \w) = \max \{ 1 - \w \cdot \phi(x) y, 0 \},
+\]
+to compute
+\[
+	\nabla_\w \Loss(x, y, \w) = \frac{\partial \Loss(x, y, \w)}{\partial \w}
+\]
+simply multiply the edges: $\darkgreen{-\1[\text{margin} < 1] \phi(x) y}$
+\end{example}
+
+
+
+
+\subsection{Backpropagation}
+Now, we can apply the same strategy to neural networks.
+%
+Here we are using the squared loss for concreteness, but one can also use the logistic or hinge losses.
+%
+Note that there is some really nice modularity here: you can pick any predictor (linear or neural network) to drive the score,
+%
+and the score can be fed into any loss function (squared, hinge, etc.).
+%%
+\begin{equation*}	
+	\displaystyle \Loss(x, y, \w) = \left(\smash[b]{\underbrace{\sum_{j=1}^k w_j \sigma(\v_j \cdot \phi(x)) - y}_{\text{neural network} - \text{target}}}\right)^2
+\end{equation*}
+\br
+
+\br
+
+% TODO: tikz
+% https://stanford-cs221.github.io/spring2020/lectures/index.html#include=learning2.js&slideId=backpropagation-3&level=1
+
+
+% \subsection{Backpropagation}
+So far, we have mainly used the graphical representation to visualize the computation of function values and gradients for our conceptual understanding.
+%
+But it turns out that the graph has algorithmic implications too.
+%
+Recall that to train any sort of model using (stochastic) gradient descent, we need to compute the gradient of the loss (top output node)
+%
+with respect to the weights (leaf nodes highlighted in red).
+%
+We also saw that these gradients (partial derivatives) are just the product of the local derivatives (green stuff) along the path from a leaf to a root.
+%
+So we can just go ahead and compute these gradients: for each red node, multiply the quantities on the edges.
+%
+However, notice that many of the paths share subpaths in common, so sometimes there's an opportunity to save computation (think dynamic programming).
+%
+To make this sharing more explicit,
+%
+for each node $i$ in the tree, define the forward value $f_i$ to be the value of the subexpression rooted at that tree,
+%
+which depends on the inputs underneath that subtree.
+%
+For example, the parent node of $w_1$ corresponds to the expression $w_1 \sigma(\v_1 \cdot \phi(x))$.
+%
+The $f_i$'s are the intermediate computations required to even evaluate the function at the root.
+%
+Next, for each node $i$ in the tree, define the backward value $g_i$ to be the gradient of the output with respect to $f_i$, the forward value of node $i$.
+%
+This measures the change that would happen in the output (root node) induced by changes to $f_i$.
+%
+Note that both $f_i$ and $g_i$ can either be scalars, vectors, or matrices, but have the same dimensionality.
+%%
+
+\begin{example}
+\bparagraph{Definition: forward/backward values.}
+\begin{itemize}
+	\item \textbf{Forward:} $f_i$ is value for subexpression rooted at $i$
+	\item \textbf{Backward:} $g_i = \frac{\partial \text{out}}{\partial f_i}$ is how $f_i$ influences output
+\end{itemize}
+\end{example}
+
+% TODO: neural networks backpropagation figure.
+% https://stanford-cs221.github.io/spring2020/lectures/index.html#include=learning2.js&slideId=backpropagation-3&level=1
+
+
+% \subsection{Backpropagation}
+We now define the backpropagation algorithm on arbitrary computation graphs.
+%
+First, in the forward pass, we go through all the nodes in the computation graph from leaves to the root,
+%
+and compute $f_i$, the value of each node $i$,
+%
+recursively given the node values of the children of $i$. These values will be used in the backward pass.
+%
+Next, in the backward pass, we go through all the nodes from the root to the leaves and compute $g_i$ recursively from $f_i$ and $g_j$,
+%
+the backward value for the parent of $i$ using the key recurrence $g_i = \frac{\partial f_j}{\partial f_i} g_j$ (just the chain rule).
+%
+In this example, the backward pass gives us the gradient of the output node (the gradient of the loss) with respect to the weights (the red nodes).
+%%
+
+\begin{algorithm}[ht]
+  \caption{Backpropagation.}
+  % \label{alg:backprop}
+  \begin{algorithmic}
+  \Function{Backpropagation}{in}
+	\State Forward pass, compute each $f_i$ (from leaves to root)
+	\State Backward pass, compute each $g_i$ (from root to leaves)
+  \EndFunction
+  \end{algorithmic}
+\end{algorithm}
+
+
+% \subsection{Note on optimization}
+While we can go through the motions of running the backpropagation algorithm to compute gradients,
+%
+what is the result of running SGD?
+%
+For linear predictors (using the squared loss or hinge loss),
+%
+$\TrainLoss(\w)$ is a convex function,
+%
+which means that SGD (with an appropriately set step size)
+%
+is theoretically guaranteed to converge to the global optimum.
+%
+However, for neural networks,
+%
+$\TrainLoss(\w)$ is typically non-convex
+%
+which means that there are multiple local optima,
+%
+and SGD is not guaranteed to converge to the global optimum.
+%
+There are many settings that SGD fails both theoretically and empirically,
+%
+but in practice, SGD on neural networks can work with proper attention to tuning hyperparameters.
+%
+The gap between theory and practice is not well understood and an active area of research.
+%%
+
+% $\TrainLoss(\w)$
+% Linear functions (convex loss)
+% Neural networks (non-convex)
+% Optimization of neural networks is generally hard
+
+% section efficient_gradients (end)
+
+
+\section{Nearest Neighbors} % (fold)
+\label{sec:nearest_neighbors}
+
+Linear predictors were governed by a simple dot product $\w \cdot \phi(x)$.
+%
+Neural networks chained together these simple primitives to yield something more complex.
+%
+Now, we will consider \textit{nearest neighbors}, which yields complexity by another mechanism:
+%
+computing similarities between examples.
+%%
+
+\textit{Nearest neighbors} is perhaps conceptually one of the simplest learning algorithms.
+%
+In a way, there is no learning.  At training time, we just store the entire training examples.
+%
+At prediction time, we get an input $x^\prime$ and we just find the input in our training set that is \textit{most similar},\sidenote[][-30mm]{
+	Commonly used distances:
+	\begin{itemize}
+		\item Manhattan ($L_1$ norm):
+		\[
+			\|\v - \v^\prime\|_1 = \sum_{i=1}^n |v_i - v_i^\prime|
+		\]
+		\item Euclidean ($L_2$ norm): 
+		\[
+			\|\v - \v^\prime\|_2 = \sqrt{\sum_{i=1}^n (v_i - v_i^\prime)^2}
+		\]
+	\end{itemize}
+} and return its output.
+%
+In a practical implementation, finding the closest input is non-trivial.
+%
+Popular choices are using k-d trees or locality-sensitive hashing.  We will not worry about this issue.
+%
+The intuition being expressed here is that similar (nearby) points tend to have similar outputs.
+%
+This is a reasonable assumption in most cases; all else equal, having a body temperature of $37$ and $37.1$
+%
+is probably not going to affect the health prediction by much.
+%%
+
+% TODO: \Algorithm{} instead of \Function!!!!!
+
+\begin{algorithm}[ht]
+  \caption{Nearest neighbors.}
+  % \label{alg:nn}
+  \begin{algorithmic}
+  \Function{NearestNeighbors}{$x^\prime, \phi, \Train$}  
+	\State Training, just store $\Train$
+	\For {predictor $f(x^\prime)$}
+		\State Find $(x,y) \in \Train$ where $\norm{\phi(x) - \phi(x^\prime)}$ is smallest
+		\State \Return $y$
+	  \EndFor
+  \EndFunction
+  \end{algorithmic}
+  \bparagraph{Key idea: similarity.} Similar examples tend to have similar outputs.
+\end{algorithm}
+
+
+
+\begin{algorithm}
+\begin{juliaverbatim}
+dist_manhattan(𝐯, 𝐯′) = norm(𝐯 - 𝐯′, 1)
+dist_euclidean(𝐯, 𝐯′) = norm(𝐯 - 𝐯′, 2)
+
+function nearest_neighbors(x′, φ, 𝒟train, dist)
+    𝒟train[argmin([dist(φ(x), φ(x′)) for (x,y) in 𝒟train])][2]
+end
+\end{juliaverbatim}
+
+\caption[][-35mm]{
+	\label{alg:nearest_neighbors}
+	\textit{Nearest neighbors} to find the \jlv{y} value in the training data \jlv{𝒟train} associated with the example closets to the input \jlv{x′} after applying feature vector \jlv{φ}.
+}
+\end{algorithm}
+
+
+% \subsection{Expressivity of nearest neighbors}
+\begin{marginfigure}[-28mm]
+\caption{
+	\label{fig:voronoi_manhat} \textit{Voronoi diagram} showing \textit{nearest neighbors} classification with \textit{Manhattan} distance ($L_1$).
+}
+\begin{jlcode}
+using ColorSchemes
+viridis_r = ColorMaps.RGBArrayMap(ColorSchemes.viridis, interpolation_levels=500, invert=true)
+p = let
+	# Voronoi diagram (Manhattan)
+	Dtrain = [
+	    ([1,5],1), 
+	    ([1,6],2), 
+	    ([2,8],3), 
+	    ([3,7],4), 
+	    ([3,6],5), 
+	    ([5,9],6), 
+	    ([6,2],7),
+	    ([7,5],8), 
+	    ([8,3],9), 
+	    ([9,9],10)]
+
+	f = (x1,x2)->nearest_neighbors([x1,x2], 𝐱->𝐱, Dtrain, dist_manhattan) 
+
+	Axis([
+	    Plots.Image(f, (0,10), (0,10), colorbar=false, xbins=200, ybins=200, colormap = viridis_r), # ColorMaps.Named("Jet")),
+	    Plots.Scatter(map(d->d[1][1], Dtrain), map(d->d[1][2], Dtrain); 
+	        onlyMarks=true, mark="*", markSize=1, style="mark options={fill=black}, white"),
+	], width="5cm", height="5cm", style="xticklabels={,,}, yticklabels={,,},")
+end
+plot(p)
+\end{jlcode}
+\begin{center}
+	\plot{fig/voronoi_manhat}
+\end{center}
+\end{marginfigure}
+\begin{marginfigure}[-6mm]
+\begin{jlcode}
+using ColorSchemes
+viridis_r = ColorMaps.RGBArrayMap(ColorSchemes.viridis, interpolation_levels=500, invert=true)
+p = let
+	# Voronoi diagram (Euclidean)
+	Dtrain = [
+	    ([1,5],1), 
+	    ([1,6],2), 
+	    ([2,8],3), 
+	    ([3,7],4), 
+	    ([3,6],5), 
+	    ([5,9],6), 
+	    ([6,2],7),
+	    ([7,5],8), 
+	    ([8,3],9), 
+	    ([9,9],10)]
+
+	f = (x1,x2)->nearest_neighbors([x1,x2], 𝐱->𝐱, Dtrain, dist_euclidean) 
+
+	Axis([
+	    Plots.Image(f, (0,10), (0,10), colorbar=false, xbins=200, ybins=200, colormap = viridis_r), # ColorMaps.Named("Jet")),
+	    Plots.Scatter(map(d->d[1][1], Dtrain), map(d->d[1][2], Dtrain); 
+	        onlyMarks=true, mark="*", markSize=1, style="mark options={fill=black}, white"),
+	], width="5cm", height="5cm", style="xticklabels={,,}, yticklabels={,,},")
+end
+plot(p)
+\end{jlcode}
+\begin{center}
+	\plot{fig/voronoi_euclid}
+\end{center}
+\caption{
+	\label{fig:voronoi_euclid} \textit{Voronoi diagram} showing \textit{nearest neighbors} classification with \textit{Euclidean} distance ($L_2$).
+}
+\end{marginfigure}
+Let's look at the decision boundary of nearest neighbors.
+% 
+The input space is partitioned into regions, such that each region has the same closest point (this is a Voronoi diagram), and each region could get a different output.
+%
+Notice that this decision boundary is much more expressive than what you could get with quadratic features.
+%
+In particular, one interesting property is that the complexity of the decision boundary adapts to the number of training examples.
+%
+As we increase the number of training examples, the number of regions will also increase.
+%
+Such methods are called \textit{non-parametric}.
+%%
+The decision boundaries are shown in the Voronoi diagrams in \cref{fig:voronoi_euclid,fig:voronoi_manhat}.
+\begin{itemize}
+\item Much more expressive than quadratic features.
+\item \textit{Non-parametric}: the hypothesis class adapts to number of examples.
+\item Simple and powerful, but kind of brute force.
+\end{itemize}
+
+
+% section nearest_neighbors (end)
+
+\subsection{Summary of learners}
+Let us conclude now.
+%
+First, we discussed some general principles for designing good features for linear predictors.
+%
+Just with the machinery of linear prediction, we were able to obtain rich predictors.
+%
+Second, we focused on expanding the expressivity of our predictors fixing a particular feature extractor $\phi$.
+%
+We covered three algorithms: \textit{linear predictors} combine the features linearly (which is rather weak), but is easy and fast.
+%
+Note that we can always make the hypothesis class arbitrarily large by adding more features, but that's another issue. % DIFF: added
+%
+\textit{Neural networks} effectively learn non-linear features, which are then used in a linear way.
+%
+This is what gives them their power and prediction speed, but they are harder to learn (due to the non-convexity of the objective function).
+%
+\textit{Nearest neighbors} is based on computing similarities with training examples.
+%
+They are powerful and easy to learn, but are slow to use for prediction because they involve enumerating (or looking up points in) the training data.
+%%
+\begin{enumerate}
+	\item \textbf{Linear predictors:} combine raw features
+	\begin{itemize}
+		\item prediction is \textbf{\darkgreen{fast}}, \textbf{\darkgreen{easy}} to learn, \textbf{\darkred{weak}} use of features.
+	\end{itemize}
+
+	\item \textbf{Neural networks:} combine learned features
+
+	\begin{itemize}
+		\item prediction is \textbf{\darkgreen{fast}}, \textbf{\darkred{hard}} to learn, \textbf{\darkgreen{powerful}} use of features.
+	\end{itemize}
+
+	\item \textbf{Nearest neighbors:} predict according to similar examples
+	\begin{itemize}
+		\item prediction is \textbf{\darkred{slow}}, \textbf{\darkgreen{easy}} to learn, \textbf{\darkgreen{powerful}} use of features.
+	\end{itemize}
+\end{enumerate}
+
+
+% chapter machine_learning_ii (end)

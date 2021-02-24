@@ -1,0 +1,11 @@
+[submodule "pygments-julia"]
+	path = lexer
+	url = https://github.com/sisl/pygments-julia.git
+	branch = master
+[submodule "juliaplots.sty"]
+	path = juliaplots.sty
+	url = https://github.com/sisl/juliaplots.sty.git
+	branch = master
+[submodule "pygments-style-algforopt"]
+	path = style
+	url = https://github.com/sisl/pygments-style-algforopt.git

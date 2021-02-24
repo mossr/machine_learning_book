@@ -1,0 +1,30 @@
+\makeatletter
+%% MOSS: reduce blank pages for PDF-only version of book
+% \begin{titlepage}
+% {\Huge
+% \noindent
+% \@title}
+% \end{titlepage}
+
+% \cleardoublepage
+
+\thispagestyle{empty}
+\vfill
+{\Huge
+\noindent
+\@title
+}\\[0.5in]
+{\Large
+\noindent
+% \@author
+}
+\vfill
+{\large
+\noindent
+Stanford, California
+% The MIT Press\\
+% Cambridge, Massachusetts\\
+% London, England
+}\\[1in]
+\makeatother
+

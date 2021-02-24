@@ -1,0 +1,21 @@
+% Compilation process:
+% make sandbox
+
+\documentclass[fullbook]{tufte_algorithms_book}
+
+\input{preamble}
+
+\title{Sandbox for Computer Scientists}
+\author[Moss]{Robert J. Moss}
+\date{2020}
+
+\begin{document}
+
+\begin{jlcode}
+	include("../../jl/support_code.jl")
+\end{jlcode}
+
+%% Change this to include the tex file of your choice.
+\include{chapter/ch2-machine-learning-i}
+
+\end{document}
