@@ -8,11 +8,14 @@
 % Remove empty pages (better for online PDF version)
 \let\cleardoublepage\clearpage
 
+% Chapter command without \newpage beforehand.
+\newcommand{\inlinechapter}[1]{{\let\cleardoublepage\relax \chapter{#1}}}
+
 \input{preamble}
 
 \setcounter{tocdepth}{2} % show subsection in TOC
 
-\title{Algorithms for Machine Learning}
+\title{Machine Learning}
 \author[Moss]{Robert J. Moss}
 \date{2021}
 
@@ -35,6 +38,13 @@
 \mainmatter
 
 \include{chapter/ch1-supervised-learning}
+\include{chapter/ch2-generative-algorithms}
+\include{chapter/ch3-kernel-methods}
+\include{chapter/ch4-svm}
+\include{chapter/ch5-deep-learning}
+\include{chapter/ch6-regularization-bias-variance}
+\include{chapter/ch7-unsupervised-learning}
+\include{chapter/ch8-the-em-algorithm}
 
 \navheader{\currentname}
 % \solutions (currently UNUSED)

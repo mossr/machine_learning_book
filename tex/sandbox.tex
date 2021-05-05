@@ -16,6 +16,37 @@
 \end{jlcode}
 
 %% Change this to include the tex file of your choice.
-\include{chapter/ch2-machine-learning-i}
+% \include{chapter/ch2-machine-learning-i}
+
+\begin{figure}
+    \begin{jlcode}
+    p = let
+        Σs = [([0,0],[1 0; 0 1]),
+              ([0,0],[1 0.5; 0.5 1]),
+              ([0,0],[1 0.8; 0.8 1])]
+        mv_gaussian_plot(Σs; heatmap=false)
+    end
+    plot(p)
+    \end{jlcode}
+    \begin{center}
+        \plot{fig/gaussian1}
+    \end{center}
+\end{figure}
+
+\begin{figure}
+    \begin{jlcode}
+    p = let
+        Σs = [([0,0],[3 0.8; 0.8 3]),
+              ([0,0],[1 -0.5; -0.5 1]),
+              ([0,0],[1 -0.8; -0.8 1])]
+        mv_gaussian_plot(Σs; heatmap=false)
+    end
+    plot(p)
+    \end{jlcode}
+    \begin{center}
+        \plot{fig/gaussian2}
+    \end{center}
+\end{figure}
+
 
 \end{document}

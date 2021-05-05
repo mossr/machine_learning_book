@@ -81,6 +81,14 @@
 \renewcommand{\paragraph}[1]{\oparagraph{\textbf{#1.}}}
 \newcommand{\bparagraph}[1]{\oparagraph{\upshape \textbf{#1}}}
 
+\newcommand{\qparagraph}[1]{\oparagraph{\textbf{#1?}}}
+
+\theoremstyle{plain} % italicized
+\newtheorem{theorem}{Theorem}
+
+\theoremstyle{definition} % non-italicized
+\newtheorem{claim}{Claim}
+
 \newenvironment{problem}{%
 	\begin{fullwidth}
 }{%
@@ -171,3 +179,8 @@
 % \algtext*{EndFor}
 \algtext*{EndIf}
 \algtext*{EndFunction}
+
+
+% https://tex.stackexchange.com/questions/12910/how-do-i-typeset-vertical-and-horizontal-lines-inside-a-matrix
+\newcommand*{\vertbar}{\rule[-1ex]{0.5pt}{2.5ex}}
+\newcommand*{\horzbar}{\rule[.5ex]{2.5ex}{0.5pt}}

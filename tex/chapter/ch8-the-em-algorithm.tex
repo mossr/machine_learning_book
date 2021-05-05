@@ -1,0 +1,535 @@
+\titlespacing*{\part}{0pt}{-20pt}{30pt} % to fix table and plot together on the first page (SEE RESTORE AT BOTTOM)
+\titlespacing*{\chapter}{0pt}{-10pt}{30pt}
+
+\part{The EM Algorithm}
+\label{part:em_alg}
+
+\marginnote{From CS229 Spring 2021, Andrew Ng, Moses Charikar, Christopher R\'e \& Tengyu Ma, Stanford University.}
+
+In the previous set of notes, we talked about the EM algorithm as applied to
+fitting a mixture of Gaussians. In this set of notes, we give a broader view
+of the EM algorithm, and show how it can be applied to a large family of
+estimation problems with latent variables. We begin our discussion with a
+very useful result called \textbf{Jensen's inequality}. % TYPO: period.
+
+\vspace{1cm}
+\inlinechapter{Jensen's inequality}\label{cha:jensens}
+Let $f$ be a function whose domain is the set of real numbers. Recall that
+$f$ is a convex function if $f^{\prime\prime}(x) \ge 0$ (for all $x \in \mathbb R$). In the case of $f$ taking
+vector-valued inputs, this is generalized to the condition that its hessian $H$
+is positive semi-definite ($H \ge 0$). If $f^{\prime\prime}(x) > 0$ for all $x$, then we say $f$ is
+strictly convex (in the vector-valued case, the corresponding statement is
+that $H$ must be positive definite, written $H > 0$). Jensen's inequality can
+then be stated as follows:
+\paragraph{Theorem} Let $f$ be a convex function, and let $X$ be a random variable. Then:
+\begin{equation}
+    \mathbb E[f(X)] \ge f(\mathbb E[X]).
+\end{equation}
+Moreover, if $f$ is strictly convex, then $\mathbb E[f(X)] = f(\mathbb E[X])$ holds true if and
+only if $X = \mathbb E[X]$ with probability $1$ (i.e., if $X$ is a constant).
+
+Recall our convention of occasionally dropping the parentheses when writing
+expectations, so in the theorem above, $f(\mathbb E X) = f(\mathbb E[X])$.
+
+For an interpretation of the theorem, consider the figure below.
+% TODO: Convex figure.
+
+Here, $f$ is a convex function shown by the solid line. Also, $X$ is a random
+variable that has a $0.5$ chance of taking the value $a$, and a $0.5$ chance of
+taking the value $b$ (indicated on the $x$-axis). Thus, the expected value of $X$
+is given by the midpoint between $a$ and $b$.
+
+We also see the values $f(a)$, $f(b)$ and $f(\mathbb E[X])$ indicated on the $y$-axis.
+Moreover, the value $\mathbb E[f(X)]$ is now the midpoint on the $y$-axis between $f(a)$
+and $f(b)$. From our example, we see that because $f$ is convex, it must be the
+case that $\mathbb E[f(X)] \ge f(EX)$.
+
+Incidentally, quite a lot of people have trouble remembering which way
+the inequality goes, and remembering a picture like this is a good way to
+quickly figure out the answer.
+
+\paragraph{Remark} Recall that $f$ is [strictly] concave if and only if $-f$ is [strictly]
+convex (i.e., $f^{\prime\prime}(x) \le 0$ or $H \le 0$). Jensen's inequality also holds for concave
+functions $f$, but with the direction of all the inequalities reversed ($\mathbb E[f(X)] \le
+f(EX)$, etc.).
+
+\vspace{1cm}
+\inlinechapter{The EM algorithm}\label{cha:em_alg}
+Suppose we have an estimation problem in which we have a training set
+$\{x^{(1)} ,\ldots,x^{(n)}\}$ consisting of $n$ independent examples. We have a latent
+variable model $p(x,z;\theta)$ with $z$ being the latent variable (which for simplicity is
+assumed to take finite number of values). The density for $x$ can be obtained
+by marginalized over the latent variable $z$:
+\begin{equation}
+    p(x;\theta) = \sum_{z} p(x,z;\theta)
+\end{equation}
+
+We wish to fit the parameters $\theta$ by maximizing the log-likelihood of the
+data, defined by:
+\begin{equation}
+    \ell(\theta) = \sum_{i=1}^n \log p(x^{(i)} ;\theta)
+\end{equation}
+We can rewrite the objective in terms of the joint density $p(x,z;\theta)$ by:
+\begin{align}
+\ell(\theta) &= \sum_{i=1}^n \log p(x^{(i)} ;\theta)\\
+    &= \sum_{i=1}^n \log \sum_{z^{(i)}} p(x^{(i)} ,z^{(i)} ;\theta)
+\end{align}
+But explicitly finding the maximum likelihood estimates of the parameters % DIFF: removed comma
+$\theta$ may be hard since it will result in difficult non-convex optimization
+problems.\footnote{
+It's mostly an empirical observation that the optimization problem is difficult to optimize.}
+Here, the $z^{(i)}$'s are the latent random variables; and it is often the case
+that if the $z^{(i)}$'s were observed, then maximum likelihood estimation would
+be easy.
+
+In such a setting, the EM algorithm gives an efficient method for
+maximum likelihood estimation. Maximizing $\ell(\theta)$ explicitly might be difficult,
+and our strategy will be to instead repeatedly construct a lower-bound on $\ell$
+(E-step), and then optimize that lower-bound (M-step).\footnote{
+Empirically, the E-step and M-step can often be computed more efficiently than
+optimizing the function $\ell(\cdot)$ directly. However, it doesn't necessarily mean that alternating
+the two steps can always converge to the global optimum of $\ell(\cdot)$. Even for mixture of
+Gaussians, the EM algorithm can either converge to a global optimum or get stuck,
+depending on the properties of the training data. Empirically, for real-world data, often EM
+can converge to a solution with relatively high likelihood (if not the optimum), and the
+theory behind it is still largely not understood.    
+}
+
+It turns out that the summation $\sum^n_{i=1}$ is not essential here, and towards a
+simpler exposition of the EM algorithm, we will first consider optimizing the
+the likelihood $\log p(x)$ for a single example $x$. After we derive the algorithm
+for optimizing $\log p(x)$, we will convert it to an algorithm that works for $n$
+examples by adding back the sum to each of the relevant equations. Thus,
+now we aim to optimize $\log p(x;\theta)$ which can be rewritten as:
+\begin{equation}
+    \log p(x;\theta) = \log \sum_{z} p(x,z;\theta)
+\end{equation}
+Let $Q$ be a distribution over the possible values of $z$. That is, $\sum_z Q(z) = 1, Q(z) \ge 0$. % TYPO: hanging paren.
+
+Consider the following:\footnote{
+If $z$ were continuous, then $Q$ would be a density, and the summations over $z$ in our
+discussion are replaced with integrals over $z$.
+}
+\begin{align}
+    \log p(x;\theta) &= \log \sum_{z} p(x,z;\theta)\\
+        &= \log \sum_{z} Q(z) \frac{p(x,z;\theta)}{Q(z)}\label{eq:ll_q_over_q}\\
+        &\ge \sum_{z} Q(z)\log\frac{p(x,z;\theta)}{Q(z)}\label{eq:ll_jensens}
+\end{align}
+
+The last step of this derivation used Jensen's inequality. Specifically,
+$f(x) = \log x$ is a concave function, since $f^{\prime\prime}(x) = -1/x^2 < 0$ over its domain
+$x \in \mathbb R^+$ . Also, the term
+\begin{equation*}
+    \sum_{z} Q(z)\left[ \frac{p(x,z;\theta)}{Q(z)} \right]
+\end{equation*}
+in the summation is just an expectation of the quantity $[p(x,z;\theta)/Q(z)]$ with
+respect to $z$ drawn according to the distribution given by $Q$.\footnote{
+We note that the notion $\frac{p(x,z;\theta)}{Q(z)}$
+only makes sense if $Q(z) \ne 0$ whenever $p(x,z;\theta) \ne 0$.
+Here we implicitly assume that we only consider those $Q$ with such a property.    
+} By Jensen's inequality, we have
+\begin{equation*}
+    f \left(\mathbb E_{z \sim Q}\left[ \frac{p(x,z;\theta)}{Q(z)}\right]\right) \ge \mathbb E_{z \sim Q} \left[f\left( \frac{p(x,z;\theta)}{Q(z)}\right)\right],
+\end{equation*}
+where the ``$z \sim Q$'' subscripts above indicate that the expectations are with
+respect to $z$ drawn from $Q$. This allowed us to go from \cref{eq:ll_q_over_q} to
+\cref{eq:ll_jensens}.
+
+Now, for \textit{any} distribution $Q$, the formula \ref{eq:ll_jensens} gives a lower-bound on
+$\log p(x;\theta)$. There are many possible choices for the $Q$'s. Which should we
+choose? Well, if we have some current guess $\theta$ of the parameters, it seems
+natural to try to make the lower-bound tight at that value of $\theta$. I.e., we will
+make the inequality above hold with equality at our particular value of $\theta$.
+To make the bound tight for a particular value of $\theta$, we need for the step
+involving Jensen's inequality in our derivation above to hold with equality.
+For this to be true, we know it is sufficient that the expectation be taken
+over a ``constant''-valued random variable. I.e., we require that
+\begin{equation*}
+    \frac{p(x,z;\theta)}{Q(z)} = c
+\end{equation*}
+for some constant $c$ that does not depend on $z$. This is easily accomplished
+by choosing
+\begin{equation*}
+    Q(z) \propto p(x,z;\theta).
+\end{equation*}
+Actually, since we know
+$\sum_z Q(z) = 1$ (because it is a distribution), this further tells us that
+\begin{align}
+    Q(z) &= \frac{p(x,z;\theta)}{\sum_z p(x,z;\theta)}\\
+        &= \frac{p(x,z;\theta)}{p(x;\theta)}\\
+        &= p(z \mid x;\theta) \label{eq:q_conditional}
+\end{align}
+Thus, we simply set the $Q$'s to be the posterior distribution of the $z$'s given
+$x$ and the setting of the parameters $\theta$.
+
+Indeed, we can directly verify that when $Q(z) = p(z \mid x;\theta)$, then
+\cref{eq:ll_jensens} is an equality because:
+\begin{align*}
+    \sum_z Q(z)\log\frac{p(x,z;\theta)}{Q(z)} &= \sum_z p(z \mid x;\theta)\log \frac{p(x,z;\theta)}{p(z \mid x;\theta)}\\
+        &= \sum_z p(z \mid x;\theta)\log \frac{p(z \mid x;\theta)p(x;\theta)}{p(z \mid x;\theta)}\\
+        &= \sum_z p(z \mid x;\theta)\log p(x;\theta)\\
+        &= \log p(x;\theta) \sum_z p(z \mid x;\theta)\\
+        &= \log p(x;\theta) \tag{because $\sum_z p(z \mid x;\theta) = 1$}    
+\end{align*}
+
+For convenience, we call the expression in \cref{eq:ll_jensens} the \textbf{evidence
+lower bound} (ELBO) and we denote it by:
+\begin{equation}
+    \operatorname{ELBO}(x;Q,\theta) = \sum_z Q(z) \log \frac{p(x,z;\theta)}{Q(z)}\label{eq:elbo}
+\end{equation}
+With this equation, we can re-write \cref{eq:ll_jensens} as:
+\begin{equation}
+    \forall Q,\theta,x, \quad \log p(x;\theta) \ge ELBO(x;Q,\theta)\label{eq:forall_elbo}
+\end{equation}
+Intuitively, the EM algorithm alternatively updates $Q$ and $\theta$ by a) setting
+$Q(z) = p(z \mid x;\theta)$ following \cref{eq:q_conditional} so that $\operatorname{ELBO}(x;Q,\theta) = \log p(x;\theta)$
+for $x$ and the current $\theta$, and b) maximizing $\operatorname{ELBO}(x;Q,\theta)$ w.r.t $\theta$ while fixing
+the choice of $Q$.
+
+Recall that all the discussion above was under the assumption that we
+aim to optimize the log-likelihood $\log p(x;\theta)$ for a single example $x$. It turns
+out that with multiple training examples, the basic idea is the same and we
+only needs to take a sum over examples at relevant places. Next, we will
+build the evidence lower bound for multiple training examples and make the
+EM algorithm formal.
+
+Recall we have a training set $\{x^{(1)} ,\ldots,x^{(n)} \}$. Note that the optimal choice
+of $Q$ is $p(z \mid x;\theta)$, and it depends on the particular example $x$. Therefore here
+we will introduce $n$ distributions $Q_1,\ldots,Q_n$, one for each example $x^{(i)}$ . For
+each example $x^{(i)}$ , we can build the evidence lower bound:
+\begin{equation*}
+    \log p(x^{(i)} ;\theta) \ge \operatorname{ELBO}(x^{(i)} ;Q_i ,\theta) = \sum_{z^{(i)}} Q_i(z^{(i)})\log\frac{p(x^{(i)},z^{(i)} ;\theta)}{Q_i (z^{(i)})}
+\end{equation*}
+Taking sum over all the examples, we obtain a lower bound for the log-
+likelihood:
+\begin{align}
+    \ell(\theta) &\ge \sum_{i} \operatorname{ELBO}(x^{(i)} ;Q_i ,\theta)\label{eq:lb_ll}\\
+        &= \sum_{i} \sum_{z^{(i)}} Q_i(z^{(i)}) \log \frac{p(x^{(i)} ,z^{(i)} ;\theta)}{Q_i(z^{(i)})}    
+\end{align}
+
+For \textit{any} set of distributions $Q_1 ,\ldots,Q_n$, the formula \ref{eq:lb_ll} gives a
+lower-bound on $\ell(\theta)$, and analogous to the argument around \cref{eq:q_conditional}, the $Q_i$
+that attains equality satisfies:
+\begin{equation*}
+    Q_i(z^{(i)}) = p(z^{(i)} \mid x^{(i)} ;\theta)
+\end{equation*}
+Thus, we simply set the $Q_i$'s to be the posterior distribution of the $z^{(i)}$'s
+given $x^{(i)}$ with the current setting of the parameters $\theta$.
+
+Now, for this choice of the $Q_i$'s, \cref{eq:lb_ll} gives a lower-bound on
+the loglikelihood $\ell$ that we're trying to maximize. This is the E-step. In
+the M-step of the algorithm, we then maximize our formula in \cref{eq:lb_ll}
+with respect to the parameters to obtain a new setting of the $\theta$'s. Repeatedly
+carrying out these two steps gives us the EM algorithm, which is as follows:
+\begin{itemize}
+    \item Repeat until convergence:
+    \begin{itemize}
+        \item (E-step) For each $i$, set:
+        \begin{equation*}
+            Q_i(z^{(i)}) := p(z^{(i)} \mid x^{(i)} ;\theta)
+        \end{equation*}
+        \item (M-step) Set:
+        \begin{align}
+            \theta &:= \argmax_\theta \sum_{i=1}^n \operatorname{ELBO}(x^{(i)} ;Q_i ,\theta)\\
+                &= \argmax_\theta\sum_{i}\sum_{z^{(i)}} Q_i(z^{(i)})\log \frac{p(x^{(i)} ,z^{(i)} ;\theta)}{Q_i(z^{(i)})}.\label{eq:m_step}
+        \end{align}
+    \end{itemize}
+\end{itemize}
+
+How do we know if this algorithm will converge? Well, suppose $\theta^{(t)}$ and
+$\theta^{(t+1)}$ are the parameters from two successive iterations of EM. We will now
+prove that $\ell(\theta^{(t)} ) \le \ell(\theta^{(t+1)} )$, which shows EM always monotonically
+improves the log-likelihood. The key to showing this result lies in our choice of
+the $Q_i$'s. Specifically, on the iteration of EM in which the parameters had
+started out as $\theta^{(t)}$, we would have chosen $Q^{(t)}_i (z^{(i)}) := p(z^{(i)} \mid x^{(i)} ;\theta^{(t)} )$.
+We saw earlier that this choice ensures that Jensen's inequality, as applied to get
+\cref{eq:lb_ll}, holds with equality, and hence:
+\begin{equation}
+    \ell(\theta^{(t)} ) = \sum_{i=1}^n \operatorname{ELBO}(x^{(i)} ;Q^{(t)}_i,\theta^{(t)} )\label{eq:lb_equality}
+\end{equation}
+The parameters $\theta^{(t+1)}$ are then obtained by maximizing the right hand side
+of the equation above. Thus,
+\begin{align*}
+    \ell(\theta^{(t+1)} ) &\ge \sum_{i=1}^n \operatorname{ELBO}(x^{(i)} ;Q^{(t)}_i,\theta^{(t+1)}) \tag{because ineqaulity \ref{eq:lb_ll} holds for all $Q$ and $\theta$}\\
+        &\ge \sum_{i=1}^n \operatorname{ELBO}(x^{(i)} ;Q^{(t)}_i ,\theta^{(t)} ) \tag{see reason below}\\
+        &= \ell(\theta^{(t)} ) \tag{by \cref{eq:lb_equality}}
+\end{align*}
+where the last inequality follows from that $\theta^{(t+1)}$ is chosen explicitly to be:
+\begin{equation*}
+    \argmax_\theta \sum_{i=1}^n \operatorname{ELBO}(x^{(i)} ;Q^{(t)}_i ,\theta)
+\end{equation*}
+
+Hence, EM causes the likelihood to converge monotonically. In our
+description of the EM algorithm, we said we'd run it until convergence. Given
+the result that we just showed, one reasonable convergence test would be
+to check if the increase in $\ell(\theta)$ between successive iterations is smaller than
+some tolerance parameter, and to declare convergence if EM is improving
+$\ell(\theta)$ too slowly.
+
+\paragraph{Remark} If we define (by overloading $\operatorname{ELBO}(\cdot)$)
+\begin{equation}
+    \operatorname{ELBO}(Q,\theta) = \sum_{i=1}^n \operatorname{ELBO}(x^{(i)} ;Q_i ,\theta) =
+    \sum_{i} \sum_{z^{(i)}} Q_i(z^{(i)}) \log \frac{p(x^{(i)} ,z^{(i)} ;\theta)}{Q_i(z^{(i)})}\label{eq:overload_elbo}
+\end{equation}
+then we know $\ell(\theta) \ge \operatorname{ELBO}(Q,\theta)$ from our previous derivation. The EM
+can also be viewed an alternating maximization algorithm on $\operatorname{ELBO}(Q,\theta)$,
+in which the E-step maximizes it with respect to $Q$ (check this yourself), and
+the M-step maximizes it with respect to $\theta$.
+
+\section{Other interpretation of ELBO}
+Let $\operatorname{ELBO}(x;Q,\theta) = \sum_z Q(z)\log\frac{p(x,z;\theta)}{Q(z)}$ be defined as in \cref{eq:elbo}. There
+are several other forms of ELBO. First, we can rewrite
+\begin{align}
+    \operatorname{ELBO}(x;Q,\theta) &= \mathbb E_{z \sim Q} [\log p(x,z;\theta)] - \mathbb E_{z \sim Q} [\log Q(z)]\\
+        &= \mathbb E_{z \sim Q} [\log p(x \mid z;\theta)] - D_{KL} (Q \mid\mid p_z)\label{eq:elbo_kl}
+\end{align}
+where we use $p_z$ to denote the marginal distribution of $z$ (under the
+distribution $p(x,z;\theta)$), and $D_{KL}()$ denotes the KL divergence:
+\begin{equation}
+    D_{KL} (Q \mid\mid p_z ) = \sum_z Q(z)\log\frac{Q(z)}{p(z)}\label{eq:kl}
+\end{equation}
+In many cases, the marginal distribution of $z$ does not depend on the
+parameter $\theta$. In this case, we can see that maximizing ELBO over $\theta$ is equivalent
+to maximizing the first term in \ref{eq:elbo_kl}. This corresponds to maximizing the
+conditional likelihood of $x$ conditioned on $z$, which is often a simpler question
+than the original question.
+
+Another form of $\operatorname{ELBO}(\cdot)$ is (please verify yourself):
+\begin{equation}
+    \operatorname{ELBO}(x;Q,\theta) = \log p(x) - D_{KL} (Q \mid\mid p_{z \mid x} )
+\end{equation}
+where $p_{z \mid x}$ is the conditional distribution of $z$ given $x$ under the parameter
+$\theta$. This forms shows that the maximizer of $\operatorname{ELBO}(Q,\theta)$ over $Q$ is obtained
+when $Q = p_{z \mid x}$, which was shown in \cref{eq:q_conditional} before.
+
+\vspace{1cm}
+\inlinechapter{Mixture of Gaussians revisited}\label{cha:gmm_revisit}
+Armed with our general definition of the EM algorithm, let's go back to our
+old example of fitting the parameters $\phi$, $\mu$ and $\Sigma$ in a mixture of Gaussians.
+For the sake of brevity, we carry out the derivations for the M-step updates
+only for $\phi$ and $\mu_j$, and leave the updates for $\Sigma_j$ as an exercise for the reader.
+
+The E-step is easy. Following our algorithm derivation above, we simply
+calculate:
+\begin{equation*}
+    w^{(i)}_j = Q_i (z^{(i)} = j) = P(z^{(i)} = j\mid x^{(i)} ;\phi,\mu,\Sigma)
+\end{equation*}
+Here, ``$Q_i (z^{(i)} = j)$'' denotes the probability of $z^{(i)}$ taking the value $j$ under
+the distribution $Q_i$.
+
+Next, in the M-step, we need to maximize, with respect to our parameters
+$\phi,\mu,\Sigma$, the quantity:
+\begin{align*}
+    \sum_{i=1}^n &\sum_{z^{(i)}}Q_i(z^{(i)}) \log \frac{p(x^{(i)} ,z^{(i)} ;\phi,\mu,\Sigma)}{Q_i(z^{(i)})}\\
+        &= \sum_{i=1}^n \sum_{j=1}^k Q_i (z^{(i)} = j) \log\frac{p(x^{(i)} \mid z^{(i)} = j;\mu,\Sigma)p(z^{(i)} = j;\phi)}{Q_i (z^{(i)} = j)}\\
+        &= \sum_{i=1}^n \sum_{j=1}^k w^{(i)}_j \log\frac{\frac{1}{(2\pi)^{d/2} |\Sigma_j|^{1/2}} \exp\left(- \frac 1 2 (x^{(i)} - \mu_j )^\top \Sigma^{-1}_j (x^{(i)} - \mu_j ) \right) \cdot \phi_j}{w^{(i)}_j}    
+\end{align*}
+Let's maximize this with respect to $\mu_l$ . If we take the derivative with respect
+to $\mu_l$, we find:
+\begin{align*}
+    \nabla_{\mu_l} &\sum_{i=1}^n \sum_{j=1}^k w^{(i)}_j \log\frac{\frac{1}{(2\pi)^{d/2} |\Sigma_j|^{1/2}}\exp \left( -\frac{1}{2} (x^{(i)} - \mu_j)^\top \Sigma^{-1}_j (x^{(i)} - \mu_j) \right) \cdot \phi_j}{w^{(i)}_j}\\
+        &= -\nabla_{\mu_l} \sum_{i=1}^n \sum_{j=1}^k w^{(i)}_j \frac 1 2 (x^{(i)} - \mu_j )^\top \Sigma^{-1}_j (x^{(i)} - \mu_j)\\
+        &=\frac{1}{2} \sum_{i=1}^n w^{(i)}_l \nabla_{\mu_l} 2\mu^\top_l \Sigma^{-1}_l x^{(i)} - \mu^\top_l \Sigma^{-1}_l \mu_l\\
+        &= \sum_{i=1}^n w^{(i)}_l \left( \Sigma^{-1}_l x^{(i)} - \Sigma^{-1}_l \mu_l \right)
+\end{align*}
+Setting this to zero and solving for $\mu_l$ therefore yields the update rule
+\begin{equation*}
+    \mu_l := \frac{\sum^n_{i=1} w^{(i)}_l x^{(i)}}{\sum^n_{i=1} w^{(i)}_l},
+\end{equation*}
+which was what we had in the previous set of notes.
+
+Let's do one more example, and derive the M-step update for the
+parameters $\phi_j$. Grouping together only the terms that depend on $\phi_j$, we find that
+we need to maximize:
+\begin{equation*}
+    \sum_{i=1}^n \sum_{j=1}^k w^{(i)}_j \log\phi_j
+\end{equation*}
+However, there is an additional constraint that the $\phi_j$'s sum to $1$, since they
+represent the probabilities $\phi_j = p(z^{(i)} = j;\phi)$. To deal with the constraint
+that $\sum^k_{j=1} \phi_j = 1$, we construct the Lagrangian
+\begin{equation*}
+    \mathcal L(\phi) = \sum_{i=1}^n \sum_{j=1}^k w^{(i)}_j \log\phi_j + \beta(\sum_{j=1}^k \phi_j - 1),
+\end{equation*}
+where $\beta$ is the Lagrange multiplier.\footnote{
+We don't need to worry about the constraint that $\phi_j \ge 0$, because as we'll shortly see,
+the solution we'll find from this derivation will automatically satisfy that anyway.    
+} Taking derivatives, we find:
+\begin{equation*}
+    \frac{\partial}{\partial\phi_j} \mathcal L(\phi) = \sum_{i=1}^n \frac{w^{(i)}_j}{\phi_j} + \beta
+\end{equation*}
+Setting this to zero and solving, we get:
+\begin{equation*}
+    \phi_j = \frac{\sum^n_{i=1} w^{(i)}_j}{-\beta}
+\end{equation*}
+I.e., $\phi_j \propto \sum^n_{i=1} w^{(i)}_j$. Using the constraint that
+$\sum_j \phi_j = 1$, we easily find that $-\beta = \sum^n_{i=1} \sum_k j=1 w^{(i)}_j = \sum^n_{i=1} 1 = n$.
+(This used the fact that $w^{(i)}_j = Q_i (z^{(i)} = j$), and since probabilities sum to $1$,
+$\sum_j w^{(i)}_j = 1$.) We therefore
+have our M-step updates for the parameters $\phi_j$:
+\begin{equation}
+    \phi_j := \frac{1}{n} \sum_{i=1}^n w^{(i)}_j
+\end{equation}
+The derivation for the M-step updates to $\Sigma_j$ are also entirely
+straightforward.
+
+\vspace{1cm}
+\begin{fullwidth}
+\inlinechapter{Variational inference and variational auto-encoder}\label{cha:variational}
+\end{fullwidth}
+Loosely speaking, variational auto-encoder\cite{kingma2013auto} generally refers to a family of
+algorithms that extend the EM algorithms to more complex models
+parameterized by neural networks. It extends the technique of variational inference
+with the additional ``re-parametrization trick'' which will be introduced
+below. Variational auto-encoder may not give the best performance for many
+datasets, but it contains several central ideas about how to extend EM
+algorithms to high-dimensional continuous latent variables with non-linear
+models. Understanding it will likely give you the language and backgrounds to
+understand various recent papers related to it.
+
+As a running example, we will consider the following parameterization of
+$p(x,z;\theta)$ by a neural network. Let $\theta$ be the collection of the weights of a
+neural network $g(z;\theta)$ that maps $z \in \mathbb R^k$ to $\mathbb R^d$. Let:
+\begin{align}
+    z &\sim \mathcal N(0, I_{k \times k})\\
+    x \mid z  &\sim  \mathcal N(g(z;\theta),\sigma^2 I_{d \times d})\label{eq:gaussian_model}
+\end{align}
+Here $I_{k \times k}$ denotes identity matrix of dimension $k$ by $k$, and $\sigma$ is a scalar that
+we assume to be known for simplicity.
+
+For the Gaussian mixture models in \cref{cha:gmm_revisit}, the optimal choice of
+$Q(z) = p(z \mid x;\theta)$ for each fixed $\theta$, that is the posterior distribution of $z$,
+can be analytically computed. In many more complex models such as the
+model \ref{eq:gaussian_model}, it's intractable to compute the exact the posterior distribution
+$p(z \mid x;\theta)$.
+
+Recall that from \cref{eq:forall_elbo}, ELBO is always a lower bound for any
+choice of $Q$, and therefore, we can also aim for finding an approximation of
+the true posterior distribution. Often, one has to use some particular form
+to approximate the true posterior distribution. Let $Q$ be a family of $Q$'s that
+we are considering, and we will aim to find a $Q$ within the family of $Q$ that is
+closest to the true posterior distribution. To formalize, recall the definition
+of the ELBO lower bound as a function of $Q$ and $\theta$ defined in \cref{eq:overload_elbo}:
+\begin{equation*}
+    \operatorname{ELBO}(Q,\theta) = \sum_{i=1}^n \operatorname{ELBO}(x^{(i)} ;Q_i ,\theta) = \sum_i\sum_{z^{(i)}} Q_i (z^{(i)}) \log \frac{p(x^{(i)} ,z^{(i)} ;\theta)}{Q_i (z^{(i)})}    
+\end{equation*}
+
+Recall that EM can be viewed as alternating maximization of $\operatorname{ELBO}(Q,\theta)$.
+Here instead, we optimize the EBLO over $Q \in \mathcal Q$:
+\begin{equation}
+    \max_{Q\in \mathcal Q} \max_\theta \operatorname{ELBO}(Q,\theta)\label{eq:max_q_in_q}
+\end{equation}
+
+Now the next question is what form of $Q$ (or what structural assumptions
+to make about $Q$) allows us to efficiently maximize the objective above. When
+the latent variable $z$ are high-dimensional discrete variables, one popular
+assumption is the \textbf{mean field assumption}, which assumes that $Q_i (z)$ gives a
+distribution with independent coordinates, or in other words, $Q_i$ can be
+decomposed into $Q_i(z) = Q^1_i(z_1)\cdots Q^k_i(z_k)$. There are tremendous applications
+of mean field assumptions to learning generative models with discrete latent
+variables, and we refer to \citeauthor{blei2017variational} for a survey of these models and their impact
+to a wide range of applications including computational biology,
+computational neuroscience, social sciences. We will not get into the details about
+the discrete latent variable cases, and our main focus is to deal with
+continuous latent variables, which requires not only mean field assumptions, but
+additional techniques.
+
+When $z \in \mathbb R^k$ is a continuous latent variable, there are several decisions to
+make towards successfully optimizing \cref{eq:max_q_in_q}. First we need to give a succinct
+representation of the distribution $Q_i$ because it is over an infinite number of
+points. A natural choice is to assume $Q_i$ is a Gaussian distribution with some
+mean and variance. We would also like to have more succinct representation
+of the means of $Q_i$ of all the examples. Note that $Q_i(z^{(i)})$ is supposed to
+approximate $p(z^{(i)} \mid x^{(i)} ;\theta)$. It would make sense let all the means of the $Q_i$'s
+be some function of $x^{(i)}$. Concretely, let $q(\cdot ;\phi),v(\cdot ;\phi)$ be two functions that
+map from dimension $d$ to $k$, which are parameterized by $\phi$ and $\psi$, we assume
+that:
+\begin{equation}
+    Q_i = \mathcal N(q(x^{(i)} ;\phi),\operatorname{diag}(v(x^{(i)} ;\psi))^2)\label{eq:q_i_diag}
+\end{equation}
+Here $\operatorname{diag}(w)$ means the $k \times k$ matrix with the entries of $w \in \mathbb R^k$ on the
+diagonal. In other words, the distribution $Q_i$ is assumed to be a Gaussian
+distribution with independent coordinates, and the mean and standard
+deviations are governed by $q$ and $v$. Often in variational auto-encoder, $q$ and $v$
+are chosen to be neural networks.\footnote{
+$q$ and $v$ can also share parameters. We sweep this level of details under the rug in this
+note.
+} In recent deep learning literature, often
+$q$,$v$ are called \textbf{encoder} (in the sense of encoding the data into latent code),
+whereas $g(z;\theta)$ if often referred to as the \textbf{decoder}.
+
+We remark that $Q_i$ of such form in many cases are very far from a good
+approximation of the true posterior distribution. However, some
+approximation is necessary for feasible optimization. In fact, the form of $Q_i$ needs to
+satisfy other requirements (which happened to be satisfied by the form \ref{eq:q_i_diag})
+
+Before optimizing the ELBO, let's first verify whether we can efficiently
+evaluate the value of the ELBO for fixed $Q$ of the form \ref{eq:q_i_diag} and $\theta$. We
+rewrite the ELBO as a function of $\phi,\psi,\theta$ by:
+\begin{align}
+    \operatorname{ELBO}(\phi,\psi,\theta) &= \sum_{i=1}^n \mathbb E_{z^{(i)} \sim Q_i}\left[\log \frac{p(x^{(i)} ,z^{(i)} ;\theta)}{Q_i (z^{(i)})} \right],\label{eq:elbo_phi_psi_theta}\\
+    \text{where } Q_i = \mathcal N(q(x^{(i)} ;\phi),\operatorname{diag}(v(x^{(i)} ;\psi))^2)
+\end{align}
+Note that to evaluate $Q_i(z^{(i)})$ inside the expectation, we should be able \textbf{to
+compute the density} of $Q_i$. To estimate the expectation $\mathbb E_{z^{(i)} \sim Q_i}$, we
+should be able \textbf{to sample from distribution} $Q_i$ so that we can build an
+empirical estimator with samples. It happens that for Gaussian distribution
+$Q_i = N(q(x^{(i)} ;\phi),\operatorname{diag}(v(x^{(i)} ;\psi))^2)$, we are able to do both efficiently. % TYPO: be -> do
+
+Now let's optimize the ELBO. It turns out that we can run gradient
+ascent over $\phi,\psi,\theta$ instead of alternating maximization. There is no strong
+need to compute the maximum over each variable at a much greater cost. (For
+Gaussian mixture model in \cref{cha:gmm_revisit}, computing the maximum is analytically
+feasible and relatively cheap, and therefore we did alternating maximization.)
+Mathematically, let $\eta$ be the learning rate, the gradient ascent step is:
+\begin{align*}
+    \theta &:= \theta + \eta\nabla_\theta \operatorname{ELBO}(\phi,\psi,\theta)\\
+    \phi &:= \phi + \eta\nabla_\phi \operatorname{ELBO}(\phi,\psi,\theta)\\
+    \psi &:= \psi + \eta\nabla_\psi \operatorname{ELBO}(\phi,\psi,\theta)
+\end{align*}
+Computing the gradient over $\theta$ is simple because:
+\begin{align}
+\nabla_\theta \operatorname{ELBO}(\phi,\psi,\theta) &= \nabla_\theta \sum_{i=1}^n \mathbb E_{z^{(i)} \sim Q_i} \left[ \frac{\log p(x^{(i)} ,z^{(i)} ;\theta)}{Q_i(z^{(i)})}\right]\\
+    &= \nabla_\theta \sum_{i=1}^n \mathbb E_{z^{(i)} \sim Q_i} \left[ \log p(x^{(i)} ,z^{(i)} ;\theta) \right]\\
+    &= \sum_{i=1}^n \mathbb E_{z^{(i)} \sim Q_i} \left[ \nabla_\theta \log p(x^{(i)} ,z^{(i)} ;\theta) \right]
+\end{align}
+
+But computing the gradient over $\phi$ and $\psi$ is tricky because the sampling
+distribution $Q_i$ depends on $\phi$ and $\psi$. (Abstractly speaking, the issue we
+face can be simplified as the problem of computing the gradient $\mathbb E_{z \sim Q_\phi} [f(\phi)]$
+with respect to variable $\phi$. We know that in general, $\nabla \mathbb E_{z \sim Q_\phi} [f(\phi)] \ne
+\mathbb E_{z \sim Q_\phi} [\nabla f(\phi)]$ because the dependency of $Q_\phi$ on $\phi$ has to be taken into
+account as well.)
+
+The idea that comes to rescue is the so-called \textbf{re-parameterization
+trick}: we rewrite $z^{(i)} \sim Q_i = \mathcal N(q(x^{(i)} ;\phi),\operatorname{diag}(v(x^{(i)} ;\psi))^2)$ in an equivalent
+way:
+\begin{equation}
+    z^{(i)} = q(x^{(i)} ;\phi) + v(x^{(i)} ;\psi) \odot \xi^{(i)} \text{ where } \xi^{(i)} \sim \mathcal N(0,I_{k \times k})
+\end{equation}
+
+Here $x \odot y$ denotes the entry-wise product of two vectors of the same
+dimension. Here we used the fact that $x \sim \mathcal N(\mu,\sigma^2 )$ is equivalent to that
+$x = \mu+\xi \sigma$ with $\xi \sim \mathcal N(0,1)$. We mostly just used this fact in every dimension
+simultaneously for the random variable $z^{(i)} \sim Q_i$.
+
+With this re-parameterization, we have that:
+\begin{align}
+    \mathbb E_{z^{(i)} \sim Q_i} \left[\log\frac{p(x^{(i)} ,z^{(i)} ;\theta)}{Q_i(z^{(i)})}\right]\\
+        &= \mathbb E_{\xi^{(i)} \sim\mathcal N(0,1)} \left[\log \frac{p(x^{(i)} ,q(x^{(i)} ;\phi) + v(x^{(i)} ;\psi) \odot \xi^{(i)} ;\theta)}{Q_i (q(x^{(i)} ;\phi) + v(x^{(i)} ;\psi) \odot \xi^{(i)} )}\right]
+\end{align}
+It follows that:
+\begin{align}
+    \nabla_\phi& \mathbb E_{z^{(i)} \sim Q_i} \left[ \log\frac{p(x^{(i)} ,z^{(i)} ;\theta)}{Q_i(z^{(i)})}\right]\\
+        &= \nabla_\phi \mathbb E_{\xi^{(i)} \sim\mathcal N(0,1)} \left[ \log\frac{p(x^{(i)} ,q(x^{(i)} ;\phi) + v(x^{(i)} ;\psi) \odot \xi^{(i)} ;\theta)}{Q_i (q(x^{(i)} ;\phi) + v(x^{(i)} ;\psi) \odot \xi^{(i)} )}\right]\\
+        &= \mathbb E_{\xi^{(i)} \sim\mathcal N(0,1)} \left[\nabla_\phi \log \frac{p(x^{(i)} ,q(x^{(i)} ;\phi) + v(x^{(i)} ;\psi) \odot \xi^{(i)} ;\theta)}{Q_i (q(x^{(i)} ;\phi) + v(x^{(i)} ;\psi) \odot \xi^{(i)} )}\right]
+\end{align}
+
+We can now sample multiple copies of $\xi^{(i)}$'s to estimate the %TYPO: the the
+expectation in the RHS of the equation above.\footnote{Empirically people sometimes just use one sample to estimate it for maximum
+computational efficiency.} We can estimate the gradient with
+respect to $\psi$ similarly, and with these, we can implement the gradient ascent
+algorithm to optimize the ELBO over $\phi,\psi,\theta$.
+
+There are not many high-dimensional distributions with analytically
+computable density function are known to be re-parameterizable. We refer to \citeauthor{kingma2013auto}
+for a few other choices that can replace Gaussian distribution.

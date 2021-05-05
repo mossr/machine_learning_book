@@ -1,0 +1,710 @@
+\titlespacing*{\part}{0pt}{-20pt}{30pt} % to fix table and plot together on the first page (SEE RESTORE AT BOTTOM)
+\titlespacing*{\chapter}{0pt}{-10pt}{30pt}
+
+\part{Support Vector Machines}
+\label{part:svms}
+
+\marginnote{From CS229 Fall 2020, Tengyu Ma, Andrew Ng, Moses Charikar, \& Christopher R\'e, Stanford University.}
+
+{\let\cleardoublepage\relax \chapter{Support vector machines}}
+This set of notes presents the Support Vector Machine (SVM) learning al-
+gorithm. SVMs are among the best (and many believe are indeed the best)
+``off-the-shelf'' supervised learning algorithms. To tell the SVM story, we'll
+need to first talk about margins and the idea of separating data with a large
+``gap.'' Next, we'll talk about the optimal margin classifier, which will lead
+us into a digression on Lagrange duality. We'll also see kernels, which give
+a way to apply SVMs efficiently in very high dimensional (such as infinite-dimensional)
+feature spaces, and finally, we'll close off the story with the
+SMO algorithm, which gives an efficient implementation of SVMs.
+
+\section{Margins: Intuition}
+We'll start our story on SVMs by talking about margins. This section will
+give the intuitions about margins and about the ``confidence'' of our predictions;
+these ideas will be made formal in \Cref{sec:margins}.
+
+Consider logistic regression, where the probability $p(y = 1 \mid x;\theta)$ is modeled
+by $h_\theta (x) = g(\theta^\top x)$. We then predict ``1'' on an input $x$ if and only if
+$h_\theta (x) \ge 0.5$, or equivalently, if and only if $\theta^\top x \ge 0$. Consider a positive
+training example $(y = 1)$. The larger $\theta^\top x$ is, the larger also is $h_\theta (x) = p(y = 1 \mid x;\theta)$,
+and thus also the higher our degree of ``confidence'' that the label is 1.
+Thus, informally we can think of our prediction as being very confident that
+$y = 1$ if $\theta^\top x \gg 0$. Similarly, we think of logistic regression as confidently
+predicting $y = 0$, if $\theta^\top x \ll 0$. Given a training set, again informally it seems
+that we'd have found a good fit to the training data if we can find $\theta$ so that
+$\theta^\top x^{(i)} \gg 0$ whenever $y^{(i)} = 1$, and $\theta^\top x^{(i)} \ll 0$ whenever $y^{(i)} = 0$, since this
+would reflect a very confident (and correct) set of classifications for all the
+training examples. This seems to be a nice goal to aim for, and we'll soon
+formalize this idea using the notion of functional margins.
+
+For a different type of intuition, consider the following figure, in which \texttt{x}'s
+represent positive training examples, \texttt{o}'s denote negative training examples,
+a decision boundary (this is the line given by the equation $\theta^\top x = 0$, and
+is also called the separating hyperplane) is also shown, and three points
+have also been labeled A, B and C.
+% TODO: Plot.
+
+Notice that the point A is very far from the decision boundary. If we are
+asked to make a prediction for the value of $y$ at A, it seems we should be
+quite confident that $y = 1$ there. Conversely, the point C is very close to
+the decision boundary, and while it's on the side of the decision boundary
+on which we would predict $y = 1$, it seems likely that just a small change to
+the decision boundary could easily have caused out prediction to be $y = 0$.
+Hence, we're much more confident about our prediction at A than at C. The
+point B lies in-between these two cases, and more broadly, we see that if
+a point is far from the separating hyperplane, then we may be significantly
+more confident in our predictions. Again, informally we think it would be
+nice if, given a training set, we manage to find a decision boundary that
+allows us to make all correct and confident (meaning far from the decision
+boundary) predictions on the training examples. We'll formalize this later
+using the notion of geometric margins.
+
+\section{Notation}
+To make our discussion of SVMs easier, we'll first need to introduce a new
+notation for talking about classification. We will be considering a linear
+classifier for a binary classification problem with labels $y$ and features $x$.
+From now, we'll use $y \in \{-1,1\}$ (instead of $\{0,1\}$) to denote the class labels.
+Also, rather than parameterizing our linear classifier with the vector $\theta$, we
+will use parameters $w,b$, and write our classifier as
+\begin{equation*}
+    h_{w,b} (x) = g(w^\top x + b).    
+\end{equation*}
+Here, $g(z) = 1$ if $z \ge 0$, and $g(z) = -1$ otherwise. This ``$w,b$'' notation
+allows us to explicitly treat the intercept term $b$ separately from the other
+parameters. (We also drop the convention we had previously of letting $x_0 = 1$
+be an extra coordinate in the input feature vector.) Thus, $b$ takes the role of
+what was previously $\theta_0$ , and $w$ takes the role of $[\theta_1 \ldots \theta_d]^\top$.
+
+Note also that, from our definition of $g$ above, our classifier will directly
+predict either $1$ or $-1$ (\textit{cf.} the perceptron algorithm), without first going % DIFF: italic cf.
+through the intermediate step of estimating $p(y = 1)$ (which is what logistic
+regression does).
+
+\section{Functional and geometric margins}\label{sec:margins}
+Let's formalize the notions of the functional and geometric margins. Given a
+training example $(x^{(i)} ,y^{(i)} )$, we define the \textbf{functional margin} of $(w,b)$ with
+respect to the training example as
+\begin{equation*}
+    \hat{\gamma}^{(i)} = y^{(i)} (w^\top x^{(i)} + b).
+\end{equation*}
+Note that if $y^{(i)} = 1$, then for the functional margin to be large (i.e., for
+our prediction to be confident and correct), we need $w^\top x^{(i)} + b$ to be a large
+positive number. Conversely, if $y^{(i)} = -1$, then for the functional margin
+to be large, we need $w^\top x^{(i)} + b$ to be a large negative number. Moreover, if
+$y^{(i)} (w^\top x^{(i)} + b) > 0$, then our prediction on this example is correct. (Check
+this yourself.) Hence, a large functional margin represents a confident and a
+correct prediction.
+
+For a linear classifier with the choice of $g$ given above (taking values in
+$\{-1,1\}$), there's one property of the functional margin that makes it not a
+very good measure of confidence, however. Given our choice of $g$, we note that
+if we replace $w$ with $2w$ and $b$ with $2b$, then since $g(w^\top x+b) = g(2w^\top x + 2b)$,
+this would not change $h_{w,b}(x)$ at all. I.e., $g$, and hence also $h_{w,b} (x)$, depends
+only on the sign, but not on the magnitude, of $w^\top x + b$. However, replacing
+$(w,b)$ with $(2w,2b)$ also results in multiplying our functional margin by a
+factor of 2. Thus, it seems that by exploiting our freedom to scale $w$ and $b$,
+we can make the functional margin arbitrarily large without really changing
+anything meaningful. Intuitively, it might therefore make sense to impose
+some sort of normalization condition such as that $\lVert w \rVert_2 = 1$; i.e., we might
+replace $(w,b)$ with $(w/\lVert w \rVert_2, b/\lVert w \rVert_2)$, and instead consider the functional
+margin of $(w/\lVert w \lVert_2 ,b/\lVert w \lVert_2)$. We'll come back to this later.
+
+Given a training set $S = \{(x^{(i)} ,y^{(i)} );i = 1,\ldots ,n\}$, we also define the
+function margin of $(w,b)$ with respect to $S$ as the smallest of the functional
+margins of the individual training examples. Denoted by $\hat{\gamma}$, this can therefore
+be written:
+\begin{equation*}
+    \hat{\gamma} = \min_{i=1,\ldots ,n} \hat{\gamma}^{(i)} % DIFF: removed period
+\end{equation*}
+Next, let's talk about \textbf{geometric margins}. Consider the picture below:
+% TODO: Plot.
+
+
+The decision boundary corresponding to $(w,b)$ is shown, along with the
+vector $w$. Note that $w$ is orthogonal (at $90^\circ$) to the separating hyperplane.
+(You should convince yourself that this must be the case.) Consider the
+point at A, which represents the input $x^{(i)}$ of some training example with
+label $y^{(i)} = 1$. Its distance to the decision boundary, $\gamma^{(i)}$, is given by the line
+segment AB.
+
+How can we find the value of $\gamma^{(i)}$ ? Well, $w/\lVert w \lVert$ is a unit-length vector
+pointing in the same direction as $w$. Since A represents $x^{(i)}$ , we therefore
+find that the point B is given by $x^{(i)} - \gamma^{(i)} \cdot w/\lVert w \rVert$. But this point lies on
+the decision boundary, and all points $x$ on the decision boundary satisfy the
+equation $w^\top x + b = 0$. Hence,
+\begin{equation*}
+    w^\top \left(x^{(i)} - \gamma^{(i)} \frac{w}{\lVert w \rVert} \right) + b = 0.    
+\end{equation*}
+Solving for $\gamma^{(i)}$ yields
+\begin{equation*}
+    \gamma^{(i)} = \frac{w^\top x^{(i)} + b}{\lVert w \rVert} = \left( \frac{w}{\lVert w \rVert} \right)^\top x^{(i)} + \frac{b}{\lVert w \rVert}.
+\end{equation*}
+This was worked out for the case of a positive training example at A in the
+figure, where being on the ``positive'' side of the decision boundary is good.
+More generally, we define the geometric margin of $(w,b)$ with respect to a
+training example $(x^{(i)} ,y^{(i)} )$ to be
+\begin{equation*}
+    \gamma^{(i)} = y^{(i)} \left(\left( \frac{w}{\lVert w \rVert}\right)^\top x^{(i)} + \frac{b}{\lVert w \rVert}\right).
+\end{equation*}
+
+Note that if $\lVert w \rVert = 1$, then the functional margin equals the geometric
+margin---this thus gives us a way of relating these two different notions of
+margin. Also, the geometric margin is invariant to rescaling of the parameters;
+i.e., if we replace $w$ with $2w$ and $b$ with $2b$, then the geometric margin
+does not change. This will in fact come in handy later. Specifically, because
+of this invariance to the scaling of the parameters, when trying to fit $w$ and $b$
+to training data, we can impose an arbitrary scaling constraint on $w$ without
+changing anything important; for instance, we can demand that $\lVert w \rVert = 1$, or
+$|w_1| = 5$, or $|w_1 + b| + |w_2| = 2$, and any of these can be satisfied simply by
+rescaling $w$ and $b$.
+
+Finally, given a training set $S = \{(x^{(i)} ,y^{(i)} );i = 1,\ldots ,n\}$, we also define
+the geometric margin of $(w,b)$ with respect to $S$ to be the smallest of the
+geometric margins on the individual training examples:
+\begin{equation*}
+    \gamma = \min_{i=1,\ldots ,n} \gamma^{(i)}.
+\end{equation*}
+
+\section{The optimal margin classifier}
+Given a training set, it seems from our previous discussion that a natural
+desideratum is to try to find a decision boundary that maximizes the (geometric)
+margin, since this would reflect a very confident set of predictions
+on the training set and a good ``fit'' to the training data. Specifically, this
+will result in a classifier that separates the positive and the negative training
+examples with a ``gap'' (geometric margin).
+
+For now, we will assume that we are given a training set that is linearly
+separable; i.e., that it is possible to separate the positive and negative examples
+using some separating hyperplane. How will we find the one that
+achieves the maximum geometric margin? We can pose the following optimizationproblem:
+\begin{align*} % TODO: correct optimization environment.
+    \max_{\gamma, w, b} \quad& \gamma\\
+    \operatorname{s.t.} \quad& y^{(i)} (w^\top x^{(i)} + b) \ge \gamma, \quad i = 1,\ldots ,n\\
+                \quad& \lVert w \rVert = 1.
+\end{align*}
+I.e., we want to maximize $\gamma$, subject to each training example having functional
+margin at least $\gamma$. The $\lVert w \rVert = 1$ constraint moreover ensures that the
+functional margin equals to the geometric margin, so we are also guaranteed
+that all the geometric margins are at least $\gamma$. Thus, solving this problem will
+result in $(w,b)$ with the largest possible geometric margin with respect to the
+training set.
+
+If we could solve the optimization problem above, we'd be done. But the
+``$\lVert w \rVert = 1$'' constraint is a nasty (non-convex) one, and this problem certainly
+isn't in any format that we can plug into standard optimization software to
+solve. So, let's try transforming the problem into a nicer one. Consider:
+\begin{align*} % TODO: correct optimization environment
+    \max_{\hat{\gamma},w,b} \quad& \frac{\hat{\gamma}}{\lVert w \rVert}\\
+    \operatorname{s.t.} \quad& y^{(i)} (w^\top x^{(i)} + b) \ge \hat{\gamma}, \quad i = 1,\ldots ,n
+\end{align*}
+Here, we're going to maximize $\hat{\gamma}/\lVert w \rVert$, subject to the functional margins all
+being at least $\hat{\gamma}$. Since the geometric and functional margins are related by
+$\gamma = \hat{\gamma}/\lVert w \rVert$, this will give us the answer we want. Moreover, we've gotten rid % TYPO: missing right-hand | in ||w||
+of the constraint $\lVert w \rVert = 1$ that we didn't like. The downside is that we now
+have a nasty (again, non-convex) objective $\frac{\hat{\gamma}}{\lVert w \rVert}$ function;
+and, we still don't have any off-the-shelf software that can solve this form of an optimization problem.
+
+Let's keep going. Recall our earlier discussion that we can add an arbitrary
+scaling constraint on $w$ and $b$ without changing anything. This is the
+key idea we'll use now. We will introduce the scaling constraint that the
+functional margin of $w,b$ with respect to the training set must be 1:
+\begin{equation*}
+    \hat{\gamma} = 1 % DIFF: removed period
+\end{equation*}
+Since multiplying $w$ and $b$ by some constant results in the functional margin
+being multiplied by that same constant, this is indeed a scaling constraint,
+and can be satisfied by rescaling $w,b$. Plugging this into our problem above,
+and noting that maximizing $\hat{\gamma}/\lVert w \rVert = 1/\lVert w \rVert$ is the same thing as minimizing
+$\lVert w \rVert^2$, we now have the following optimization problem:
+\begin{align*} % TODO: optimization environment
+    \min_{w,b} \quad& \frac{1}{2} \lVert w \rVert^2\\
+    \operatorname{s.t.} \quad& y^{(i)} (w^\top x^{(i)} + b) \ge 1, \quad i = 1,\ldots ,n
+\end{align*}
+
+We've now transformed the problem into a form that can be efficiently
+solved. The above is an optimization problem with a convex quadratic objective
+and only linear constraints. Its solution gives us the \textbf{optimal margin
+classifier}. This optimization problem can be solved using commercial
+quadratic programming (QP) code.\footnote{
+You may be familiar with linear programming, which solves optimization problems
+that have linear objectives and linear constraints. QP software is also widely available,
+which allows convex quadratic objectives and linear constraints.}
+
+While we could call the problem solved here, what we will instead do is
+make a digression to talk about Lagrange duality. This will lead us to our
+optimization problem's dual form, which will play a key role in allowing us to
+use kernels to get optimal margin classifiers to work efficiently in very high
+dimensional spaces. The dual form will also allow us to derive an efficient
+algorithm for solving the above optimization problem that will typically do
+much better than generic QP software.
+
+\section{Lagrange duality (optional reading)}
+Let's temporarily put aside SVMs and maximum margin classifiers, and talk
+about solving constrained optimization problems.
+Consider a problem of the following form:
+\begin{align*} % TODO: optimization environment
+    \min_w \quad& f(w)\\
+    \operatorname{s.t.} \quad& h_i (w) = 0, \quad i = 1,\ldots,l.    
+\end{align*}
+Some of you may recall how the method of Lagrange multipliers can be used
+to solve it. (Don't worry if you haven't seen it before.) In this method, we
+define the Lagrangian to be{}
+\begin{equation*}
+    \mathcal L(w,\beta) = f(w) + \sum_{i=1}^l \beta_i h_i (w)
+\end{equation*}
+Here, the $\beta_i$'s are called the \textbf{Lagrange multipliers}. We would then find
+and set $\mathcal{L}$'s partial derivatives to zero:
+\begin{equation*}
+    \frac{\partial \mathcal L}{\partial w_i} = 0; \quad \frac{\partial \mathcal L}{\partial \beta_i} = 0,    
+\end{equation*}
+and solve for $w$ and $\beta$.
+
+In this section, we will generalize this to constrained optimization problems
+in which we may have inequality as well as equality constraints. Due to
+time constraints, we won't really be able to do the theory of Lagrange duality
+justice in this class,\footnote{% TODO: citation
+Readers interested in learning more about this topic are encouraged to read, e.g., R.
+T. Rockarfeller (1970), \textit{Convex Analysis}, Princeton University Press.
+} but we will give the main ideas and results, which we
+will then apply to our optimal margin classifier's optimization problem.
+
+Consider the following, which we'll call the \textbf{primal} optimization problem:
+\begin{align*}
+    \min_w \quad& f(w)\\
+    \operatorname{s.t.} \quad& g_i (w) \le 0,\quad i = 1,\ldots ,k\\
+    \quad& h_i (w) = 0, \quad i = 1,\ldots ,l.
+\end{align*}
+To solve it, we start by defining the \textbf{generalized Lagrangian}
+\begin{equation*}
+    \mathcal L(w,\alpha,\beta) = f(w) + \sum_{i=1}^k \alpha_i g_i(w) + \sum_{i=1}^l \beta_i h_i(w).
+\end{equation*}
+Here, the $\alpha_i$'s and $\beta_i$'s are the Lagrange multipliers. Consider the quantity
+\begin{equation*}
+    \theta_{\mathcal P}(w) = \max_{\alpha,\beta :\alpha_i \ge 0} \mathcal L(w,\alpha,\beta).
+\end{equation*}
+Here, the ``$\mathcal P$'' subscript stands for ``primal.'' Let some $w$ be given. If $w$
+violates any of the primal constraints (i.e., if either $g_i (w) > 0$ or $h_i (w) \ne 0$
+for some $i$), then you should be able to verify that
+\begin{align*}
+    \theta_{\mathcal P}(w) &= \max_{\alpha,\beta :\alpha_i \ge 0} f(w) + \sum_{i=1}^k \alpha_i g_i(w) + \sum_{i=1}^l \beta_i h_i (w)\\
+    &= \infty.\label{eq:primal_violated}
+\end{align*}
+Conversely, if the constraints are indeed satisfied for a particular value of $w$,
+then $\theta_{\mathcal{P}}(w) = f(w)$. Hence,
+\begin{equation*}
+    \theta_{\mathcal P} (w) = \begin{cases}
+        f(w) & \text{if $w$ satisfies primal constraints}\\
+        \infty & \text{otherwise}.
+    \end{cases}    
+\end{equation*}
+Thus, $\theta_{\mathcal P}$ takes the same value as the objective in our problem for all values
+of $w$ that satisfies the primal constraints, and is positive infinity if the
+constraints are violated. Hence, if we consider the minimization problem
+\begin{equation*}
+    \min_w \theta_{\mathcal P}(w) = \min_w \max_{\alpha,\beta :\alpha_i \ge 0} \mathcal L(w,\alpha,\beta),
+\end{equation*}
+we see that it is the same problem (i.e., and has the same solutions as) our
+original, primal problem. For later use, we also define the optimal value of
+the objective to be $p^* = \min_w \theta_{\mathcal P} (w)$; we call this the \textbf{value} of the primal
+problem.
+
+Now, let's look at a slightly different problem. We define
+\begin{equation*}
+    \theta_{\mathcal D} (\alpha,\beta) = \min_w \mathcal L(w,\alpha,\beta).
+\end{equation*}
+Here, the ``$\mathcal D$'' subscript stands for ``dual.'' Note also that whereas in the
+definition of $\theta_{\mathcal P}$ we were optimizing (maximizing) with respect to $\alpha,\beta$, here
+we are minimizing with respect to $w$.
+
+We can now pose the \textbf{dual} optimization problem:
+\begin{equation*}
+    \max_{\alpha,\beta :\alpha_i \ge 0} \theta_{\mathcal D} (\alpha,\beta) = \max_{\alpha,\beta :\alpha_i \ge 0} \min_w \mathcal L(w,\alpha,\beta).
+\end{equation*}
+This is exactly the same as our primal problem shown above, except that the
+order of the ``max'' and the ``min'' are now exchanged. We also define the
+optimal value of the dual problem's objective to be $d^* = \max_{\alpha,\beta :\alpha_i \ge 0} \theta_{\mathcal D} (w)$.
+
+How are the primal and the dual problems related? It can easily be shown
+that
+\begin{equation*}
+    d^* = \max_{\alpha,\beta :\alpha_i \ge 0} \min_w \mathcal L(w,\alpha,\beta) \le \min_w \max_{\alpha,\beta :\alpha_i \ge 0} \mathcal L(w,\alpha,\beta) = p^*.    
+\end{equation*}
+(You should convince yourself of this; this follows from the ``max min'' of a
+function always being less than or equal to the ``min max.'') However, under
+certain conditions, we will have
+\begin{equation*}
+    d^* = p^*,
+\end{equation*}
+so that we can solve the dual problem in lieu of the primal problem. Let's
+see what these conditions are.
+
+Suppose $f$ and the $g_i$'s are convex,\footnote{
+When $f$ has a Hessian, then it is convex if and only if the Hessian is positive semi-definite.
+For instance, $f(w) = w^\top w$ is convex; similarly, all linear (and affine) functions
+are also convex. (A function $f$ can also be convex without being differentiable, but we
+won't need those more general definitions of convexity here.)} and the $h_i$'s are affine.\footnote{
+I.e., there exists $a_i , b_i$ , so that $h_i (w) = a^\top_i w + b_i$. ``Affine'' means the same thing as
+linear, except that we also allow the extra intercept term $b_i$.} Suppose
+further that the constraints $g_i$ are (strictly) feasible; this means that there
+exists some $w$ so that $g_i (w) < 0$ for all $i$.
+
+Under our above assumptions, there must exist $w^* ,\alpha^* ,\beta^*$ so that $w^*$ is the
+solution to the primal problem, $\alpha^*$ ,$\beta^*$ are the solution to the dual problem,
+and moreover $p^* = d^* = L(w^* ,\alpha^* ,\beta^*)$. Moreover, $w^*$ ,$\alpha^*$ and $\beta^*$ satisfy the
+\textbf{Karush-Kuhn-Tucker (KKT) conditions}, which are as follows:
+\begin{align}
+    \frac{\partial}{\partial w_i} \mathcal L(w^* ,\alpha^* ,\beta^* ) &= 0, \quad i = 1,\ldots ,d\label{eq:kkt1}\\
+    \frac{\partial}{\partial \beta_i} \mathcal L(w^* ,\alpha^* ,\beta^* ) &= 0, \quad i = 1,\ldots ,l\label{eq:kkt2}\\
+    \alpha^*_i g_i (w^*) &= 0, \quad i = 1,\ldots ,k\label{eq:kkt3}\\
+    g_i (w^*) &\le 0, \quad i = 1,\ldots ,k\label{eq:kkt4}\\
+    \alpha^* &\ge 0, \quad i = 1,\ldots ,k\label{eq:kkt5}
+\end{align}
+Moreover, if some $w^* ,\alpha^* ,\beta^*$ satisfy the KKT conditions, then it is also a
+solution to the primal and dual problems.
+
+We draw attention to \Cref{eq:kkt3}, which is called the KKT \textbf{dual
+complementarity} condition. Specifically, it implies that if $\alpha^*_i > 0$, then
+$g_i (w^*) = 0$. (I.e., the ``$g_i (w) \le 0$'' constraint is \textbf{active}, meaning it holds with
+equality rather than with inequality.) Later on, this will be key for showing
+that the SVM has only a small number of ``support vectors''; the KKT dual
+complementarity condition will also give us our convergence test when we
+talk about the SMO algorithm.
+
+\section{Optimal margin classifiers}
+\textit{\textbf{Note}: The equivalence of optimization problem \ref{eq:opt_margin_classifier} and the optimization
+problem \ref{eq:opt_problem_dual}, and the relationship between the primary and dual variables in
+equation \ref{eq:w_alpha_dual} are the most important take home messages of this section.}
+
+Previously, we posed the following (primal) optimization problem for finding
+the optimal margin classifier:
+\begin{align}
+    \min_{w,b} \quad& \frac{1}{2}\lVert w \rVert^2\label{eq:opt_margin_classifier}\\
+    \operatorname{s.t.} \quad& y^{(i)} (w^\top x^{(i)} + b) \ge 1, \quad i = 1,\ldots ,n
+\end{align}
+We can write the constraints as
+\begin{equation*}
+    g_i (w) = -y^{(i)} (w^\top x^{(i)} + b) + 1 \le 0.
+\end{equation*}
+We have one such constraint for each training example. Note that from the
+KKT dual complementarity condition, we will have $\alpha_i > 0$ only for the training
+examples that have functional margin exactly equal to one (i.e., the ones
+corresponding to constraints that hold with equality, $g_i (w) = 0$). Consider
+the figure below, in which a maximum margin separating hyperplane is shown
+by the solid line.
+% TODO: Plot.
+
+The points with the smallest margins are exactly the ones closest to the
+decision boundary; here, these are the three points (one negative and two positive
+examples) that lie on the dashed lines parallel to the decision boundary.
+Thus, only three of the $\alpha_i$'s---namely, the ones corresponding to these three
+training examples---will be non-zero at the optimal solution to our optimization
+problem. These three points are called the \textbf{support vectors} in this
+problem. The fact that the number of support vectors can be much smaller
+than the size the training set will be useful later.
+
+Let's move on. Looking ahead, as we develop the dual form of the problem,
+one key idea to watch out for is that we'll try to write our algorithm
+in terms of only the inner product $\langle x^{(i)} ,x^{(j)} \rangle$ (think of this as $(x^{(i)} )^\top x^{(j)}$ )
+between points in the input feature space. The fact that we can express our
+algorithm in terms of these inner products will be key when we apply the
+kernel trick.
+
+When we construct the Lagrangian for our optimization problem we have:
+\begin{equation*}
+    \mathcal L(w,b,\alpha) = \frac 1 2 \lVert w \rVert^2 - \sum_{i=1}^n \alpha_i \left[y^{(i)} (w^\top x^{(i)} + b) - 1 \right].\label{eq:lagrangian_svm}
+\end{equation*}
+Note that there're only ``$\alpha_i$'' but no ``$\beta_i$'' Lagrange multipliers, since the
+problem has only inequality constraints.
+
+Let's find the dual form of the problem. To do so, we need to first
+minimize $\mathcal L(w,b,\alpha)$ with respect to $w$ and $b$ (for fixed $\alpha$), to get $\theta_{\mathcal D}$ , which
+we'll do by setting the derivatives of $\mathcal L$ with respect to $w$ and $b$ to zero. We
+have:
+\begin{equation*}
+\nabla_w \mathcal L(w,b,\alpha) = w - \sum_{i=1}^n \alpha_i y^{(i)} x^{(i)} = 0
+\end{equation*}
+This implies that
+
+\begin{equation}
+    w = \sum_{i=1}^n \alpha_i y^{(i)} x^{(i)}.\label{eq:w_alpha_dual}
+\end{equation}
+As for the derivative with respect to b, we obtain
+\begin{equation}
+    \frac{\partial}{\partial b} \mathcal L(w,b,\alpha) = \sum_{i=1}^n \alpha_i y^{(i)} = 0.\label{eq:lagrang_partial}
+\end{equation}
+
+If we take the definition of $w$ in \Cref{eq:w_alpha_dual} and plug that back into
+the Lagrangian (\Cref{eq:lagrangian_svm}), and simplify, we get
+\begin{equation}
+    \mathcal L(w,b,\alpha) = \sum_{i=1}^n \alpha_i - \frac{1}{2} \sum_{i,j=1}^n y^{(i)} y^{(j)} \alpha_i \alpha_j (x^{(i)} )^\top x^{(j)} - b \sum_{i=1}^n \alpha_i y^{(i)}.
+\end{equation}
+But from \Cref{eq:lagrang_partial}, the last term must be zero, so we obtain
+\begin{equation*}
+    \mathcal L(w,b,\alpha) = \sum_{i=1}^n \alpha_i - \frac{1}{2} \sum_{i,j=1}^n y^{(i)} y^{(j)} \alpha_i \alpha_j (x^{(i)} )^\top x^{(j)}.    
+\end{equation*}
+Recall that we got to the equation above by minimizing $\mathcal L$ with respect to $w$
+and $b$. Putting this together with the constraints $\alpha_i \ge 0$ (that we always had)
+and the constraint from \cref{eq:lagrang_partial}, we obtain the following dual optimization problem:
+\begin{align}
+    \max_{\alpha} \quad& W(\alpha) = \sum_{i=1}^n \alpha_i - \frac{1}{2} \sum_{i,j=1}^n y^{(i)} y^{(j)} \alpha_i \alpha_j \langle x^{(i)} ,x^{(j)} \rangle.\label{eq:opt_problem_dual}\\
+    \operatorname{s.t.} \quad& \alpha_i \ge 0, \quad i = 1,\ldots ,n\\
+    \quad& \sum_{i=1}^n \alpha_i y^{(i)} = 0. % TYPO: period
+\end{align}
+
+You should also be able to verify that the conditions required for $p^* = d^*$
+and the KKT conditions (\Cref{eq:kkt1,eq:kkt2,eq:kkt3,eq:kkt4,eq:kkt5}) to hold are indeed satisfied in
+our optimization problem. Hence, we can solve the dual in lieu of solving
+the primal problem. Specifically, in the dual problem above, we have a
+maximization problem in which the parameters are the $\alpha_i$'s. We'll talk later
+about the specific algorithm that we're going to use to solve the dual problem,
+but if we are indeed able to solve it (i.e., find the $\alpha$'s that maximize $W(\alpha)$
+subject to the constraints), then we can use \Cref{eq:w_alpha_dual} to go back and
+find the optimal $w$'s as a function of the $\alpha$'s. Having found $w^*$ , by considering
+the primal problem, it is also straightforward to find the optimal value for
+the intercept term $b$ as
+\begin{equation}
+    b^* = -\frac{\max_{i:y^{(i)} = -1} w^{*\top} x^{(i)} + \min_{i:y^{(i)} =1} w^{*\top}x^{(i)}}{2}\label{eq:b_optimal}.
+\end{equation}
+(Check for yourself that this is correct.)
+
+Before moving on, let's also take a more careful look at \Cref{eq:w_alpha_dual},
+which gives the optimal value of $w$ in terms of (the optimal value of) $\alpha$.
+Suppose we've fit our model's parameters to a training set, and now wish to
+make a prediction at a new point input $x$. We would then calculate $w^\top x+b$,
+and predict $y = 1$ if and only if this quantity is bigger than zero. But
+using \cref{eq:w_alpha_dual}, this quantity can also be written:
+\begin{align}
+    w^\top x + b &= \left( \sum_{i=1}^n \alpha_i y^{(i)} x^{(i)} \right)^\top x + b\label{eq:w_alpha_dual_expand1}\\
+    &= \sum_{i=1}^n \alpha_i y^{(i)} \langle x^{(i)} ,x \rangle + b\label{eq:w_alpha_dual_expand2}.
+\end{align}
+Hence, if we've found the $\alpha_i$'s, in order to make a prediction, we have to
+calculate a quantity that depends only on the inner product between $x$ and
+the points in the training set. Moreover, we saw earlier that the $\alpha_i$'s will all
+be zero except for the support vectors. Thus, many of the terms in the sum
+above will be zero, and we really need to find only the inner products between
+$x$ and the support vectors (of which there is often only a small number) in
+order calculate \cref{eq:w_alpha_dual_expand2} and make our prediction.
+
+By examining the dual form of the optimization problem, we gained significant
+insight into the structure of the problem, and were also able to write
+the entire algorithm in terms of only inner products between input feature
+vectors. In the next section, we will exploit this property to apply the kernels
+to our classification problem. The resulting algorithm, \textbf{support vector
+machines}, will be able to efficiently learn in very high dimensional spaces.
+
+\section{Regularization and the non-separable case (optional reading)}
+The derivation of the SVM as presented so far assumed that the data is
+linearly separable. While mapping data to a high dimensional feature space
+via $\phi$ does generally increase the likelihood that the data is separable, we
+can't guarantee that it always will be so. Also, in some cases it is not clear
+that finding a separating hyperplane is exactly what we'd want to do, since
+that might be susceptible to outliers. For instance, the left figure below
+shows an optimal margin classifier, and when a single outlier is added in the
+upper-left region (right figure), it causes the decision boundary to make a
+dramatic swing, and the resulting classifier has a much smaller margin.
+% TODO: plots
+
+To make the algorithm work for non-linearly separable datasets as well
+as be less sensitive to outliers, we reformulate our optimization (using $\ell_1$
+\textbf{regularization}) as follows:
+\begin{align*}
+    \min_{\gamma,w,b} \quad& \frac{1}{2} \lVert w \rVert^2 + C \sum_{i=1}^n \xi_i\\
+    \operatorname{s.t.} \quad& y^{(i)} (w^\top x^{(i)} + b) \ge 1 - \xi_i ,\quad i = 1,\ldots ,n\\
+    \quad& \xi_i \ge 0,\quad i = 1,\ldots ,n.
+\end{align*}
+Thus, examples are now permitted to have (functional) margin less than 1,
+and if an example has functional margin $1 - \xi_i$ (with $\xi > 0$), we would pay
+a cost of the objective function being increased by $C\xi_i$. The parameter $C$
+controls the relative weighting between the twin goals of making the $\lVert w \rVert^2$
+small (which we saw earlier makes the margin large) and of ensuring that
+most examples have functional margin at least 1.
+
+As before, we can form the Lagrangian:
+\begin{equation*}
+    \mathcal L(w,b,\xi,\alpha,r) = \frac{1}{2} w^\top w + C \sum_{i=1}^n \xi_i - \sum_{i=1}^n \alpha_i \left[ y^{(i)} (x^\top w + b) - 1 + \xi_i \right] - \sum_{i=1}^n r_i \xi_i.    
+\end{equation*}
+Here, the $\alpha_i$ 's and $r_i$'s are our Lagrange multipliers (constrained to be $\ge 0$).
+We won't go through the derivation of the dual again in detail, but after
+setting the derivatives with respect to $w$ and $b$ to zero as before, substituting
+them back in, and simplifying, we obtain the following dual form of the
+problem:{}
+\begin{align*}
+    \max_\alpha \quad& W(\alpha) = \sum_{i=1}^n \alpha_i - \frac{1}{2} \sum_{i,j=1}^n y^{(i)} y^{(j)} \alpha_i \alpha_j \langle x^{(i)} ,x^{(j)} \rangle\\
+    \operatorname{s.t.} \quad& 0 \le \alpha_i \le C,\quad i = 1,\ldots ,n\\
+    \quad& \sum_{i=1}^n \alpha_i y^{(i)} = 0. % TYPO: period (not comma)
+\end{align*}
+
+As before, we also have that $w$ can be expressed in terms of the $\alpha_i$ 's
+as given in \cref{eq:w_alpha_dual}, so that after solving the dual problem, we can
+continue to use \cref{eq:w_alpha_dual_expand2} to make our predictions. Note that, somewhat
+surprisingly, in adding $\ell_1$ regularization, the only change to the dual problem
+is that what was originally a constraint that $0 \le \alpha_i$ has now become $0 \le
+\alpha_i \le C$. The calculation for $b^*$ also has to be modified (\cref{eq:b_optimal} is no
+longer valid); see the comments in the next section/Platt's paper. % TODO: cite "Platt's paper"
+
+Also, the KKT dual-complementarity conditions (which in the next section
+will be useful for testing for the convergence of the SMO algorithm) are:
+\begin{align}
+    \alpha_i = 0 &\implies y^{(i)} (w^\top x^{(i)} + b) \ge 1\label{eq:kkt_dual1}\\
+    \alpha_i = C &\implies y^{(i)} (w^\top x^{(i)} + b) \le 1\label{eq:kkt_dual2}\\
+    0 < \alpha_i < C &\implies y^{(i)} (w^\top x^{(i)} + b) = 1\label{eq:kkt_dual3}.    
+\end{align}
+
+Now, all that remains is to give an algorithm for actually solving the dual
+problem, which we will do in the next section.
+
+\section{The SMO algorithm (optional reading)}
+The SMO (sequential minimal optimization) algorithm, due to John Platt, % TODO: cite.
+gives an efficient way of solving the dual problem arising from the derivation
+of the SVM. Partly to motivate the SMO algorithm, and partly because it's
+interesting in its own right, let's first take another digression to talk about
+the coordinate ascent algorithm.
+
+\subsection{Coordinate ascent}
+Consider trying to solve the unconstrained optimization problem
+\begin{equation*}
+\max_\alpha W(\alpha_1 ,\alpha_2 ,\ldots ,\alpha_n ).
+\end{equation*}
+Here, we think of $W$ as just some function of the parameters $\alpha_i$ 's, and for now
+ignore any relationship between this problem and SVMs. We've already seen
+two optimization algorithms, gradient ascent and Newton's method. The
+new algorithm we're going to consider here is called \textbf{coordinate ascent}:
+\begin{algorithm}[ht]
+    \caption{Coordinate ascent.}
+    \label{alg:coordinate_ascent}
+    \begin{algorithmic}
+    \Repeat
+        \For{$i = 1, \ldots, n$}
+            \State $\alpha_i := \argmax_{\hat{\alpha}_i} W(\alpha_1 ,\ldots ,\alpha_{i-1}, \hat{\alpha}_i ,\alpha_{i+1},\ldots ,\alpha_n)$.
+        \EndFor
+    \Until{convergence}
+    \end{algorithmic}
+\end{algorithm}
+
+Thus, in the innermost loop of this algorithm, we will hold all the variables
+except for some $\alpha_i$ fixed, and reoptimize $W$ with respect to just the parameter
+$\alpha_i$. In the version of this method presented here, the inner-loop reoptimizes
+the variables in order $\alpha_1 ,\alpha_2 ,\ldots ,\alpha_n ,\alpha_1 ,\alpha_2 ,\ldots$  (A more sophisticated version
+might choose other orderings; for instance, we may choose the next variable
+to update according to which one we expect to allow us to make the largest
+increase in $W(\alpha)$.)
+
+When the function $W$ happens to be of such a form that the ``$\argmax$''
+in the inner loop can be performed efficiently, then coordinate ascent can be
+a fairly efficient algorithm. Here's a picture of coordinate ascent in action:
+% TODO: Plot.
+
+The ellipses in the figure are the contours of a quadratic function that
+we want to optimize. Coordinate ascent was initialized at $(2,-2)$, and also
+plotted in the figure is the path that it took on its way to the global maximum.
+Notice that on each step, coordinate ascent takes a step that's parallel to one
+of the axes, since only one variable is being optimized at a time.
+
+\section{SMO}
+We close off the discussion of SVMs by sketching the derivation of the SMO
+algorithm.
+
+Here's the (dual) optimization problem that we want to solve:
+\begin{align}
+    \max_\alpha \quad& W(\alpha) = \sum_{i=1}^n \alpha_i - \frac{1}{2} \sum_{i,j=1}^n y^{(i)} y^{(j)} \alpha_i \alpha_j \langle x^{(i)} ,x^{(j)} \rangle\label{eq:smo_dual_max}.\\
+    \operatorname{s.t.} \quad& 0 \le \alpha_i \le C, \quad i = 1,\ldots,n\label{eq:smo_dual_st1}\\
+    \quad& \sum_{i=1}^n \alpha_i y^{(i)} = 0\label{eq:smo_dual_st2}. (33)
+\end{align}
+
+Let's say we have set of $\alpha_i$'s that satisfy the constraints in \cref{eq:smo_dual_st1,eq:smo_dual_st2}. Now,
+suppose we want to hold $\alpha_2 ,\ldots,\alpha_n$ fixed, and take a coordinate ascent step
+and reoptimize the objective with respect to $\alpha_1$. Can we make any progress?
+The answer is no, because the constraint \ref{eq:smo_dual_st2} ensures that
+\begin{equation*}
+    \alpha_1 y^{(1)} = -\sum_{i=2}^n \alpha_i y^{(i)}.
+\end{equation*}
+Or, by multiplying both sides by $y^{(1)}$, we equivalently have
+\begin{equation*}
+    \alpha_1 = -y^{(1)} \sum_{i=2}^n \alpha_i y^{(i)}.
+\end{equation*}
+(This step used the fact that $y^{(1)} \in \{-1,1\}$, and hence $(y^{(1)})^2 = 1$.) Hence,
+$\alpha_1$ is exactly determined by the other $\alpha_i$'s, and if we were to hold $\alpha_2 ,\ldots,\alpha_n$
+fixed, then we can't make any change to $\alpha_1$ without violating the constraint \ref{eq:smo_dual_st2} in the optimization problem.
+
+Thus, if we want to update some subject of the $\alpha_i$'s, we must update at
+least two of them simultaneously in order to keep satisfying the constraints.
+This motivates the SMO algorithm, which simply does the following:
+\begin{algorithm}[ht]
+    \caption{SMO algorithm.}
+    \label{alg:smo}
+    \begin{algorithmic}
+    \Repeat
+        \begin{enumerate}
+            \item Select some pair $\alpha_i$ and $\alpha_j$ to update next (using a heuristic that tries to pick the two that will allow us to make the biggest progress towards the global maximum).
+            \item Reoptimize $W(\alpha)$ with respect to $\alpha_i$ and $\alpha_j$, while holding all the other $\alpha_k$'s ($k \ne i,j$) fixed.
+        \end{enumerate}
+    \Until{convergence}
+    \end{algorithmic}
+\end{algorithm}
+
+To test for convergence of this algorithm, we can check whether the KKT
+conditions (\cref{eq:kkt_dual1,eq:kkt_dual2,eq:kkt_dual3}) are satisfied to within some \textit{tol}. Here, \textit{tol} is
+the convergence tolerance parameter, and is typically set to around 0.01 to
+0.001. (See the paper and pseudocode for details.)
+
+The key reason that SMO is an efficient algorithm is that the update to
+$\alpha_i , \alpha_j$ can be computed very efficiently. Let's now briefly sketch the main
+ideas for deriving the efficient update.
+
+Let's say we currently have some setting of the $\alpha_i$'s that satisfy the constraints \ref{eq:smo_dual_st1}--\ref{eq:smo_dual_st2}, and suppose we've decided to hold $\alpha_3 ,\ldots,\alpha_n$ fixed, and
+want to reoptimize $W(\alpha_1 ,\alpha_2 ,\ldots,\alpha_n )$ with respect to $\alpha_1$ and $\alpha_2$ (subject to
+the constraints). From \cref{eq:smo_dual_st2}, we require that
+\begin{equation*}
+    \alpha_1 y^{(1)} + \alpha_2 y^{(2)} = -\sum_{i=3}^n \alpha_i y^{(i)}.
+\end{equation*}
+Since the right hand side is fixed (as we've fixed $\alpha_3 ,\ldots\alpha_n$ ), we can just let
+it be denoted by some constant $\zeta$:
+\begin{equation*}
+    \alpha_1 y^{(1)} + \alpha_2 y^{(2)} = \zeta\label{eq:alpha_zeta}.
+\end{equation*}
+We can thus picture the constraints on $\alpha_1$ and $\alpha_2$ as follows:
+% TODO: Plot.
+
+From the constraints \ref{eq:smo_dual_st1}, we know that $\alpha_1$ and $\alpha_2$ must lie within the box
+$[0,C]\times[0,C]$ shown. Also plotted is the line $\alpha_1 y^{(1)} +\alpha_2 y^{(2)} = \zeta$, on which we
+know $\alpha_1$ and $\alpha_2$ must lie. Note also that, from these constraints, we know
+$L \le \alpha_2 \le H$; otherwise, $(\alpha_1 ,\alpha_2 )$ can't simultaneously satisfy both the box
+and the straight line constraint. In this example, $L = 0$. But depending on
+what the line $\alpha_1 y^{(1)} + \alpha_2 y^{(2)} = \zeta$ looks like, this won't always necessarily be
+the case; but more generally, there will be some lower-bound $L$ and some
+upper-bound $H$ on the permissible values for $\alpha_2$ that will ensure that $\alpha_1 , \alpha_2$
+lie within the box $[0,C] \times [0,C]$.
+
+Using \cref{eq:alpha_zeta}, we can also write $\alpha_1$ as a function of $\alpha_2$:
+\begin{equation*}
+    \alpha_1 = (\zeta - \alpha_2 y^{(2)} )y^{(1)}.
+\end{equation*}
+(Check this derivation yourself; we again used the fact that $y^{(1)} \in \{-1,1\}$ so
+that $(y^{(1)})^2 = 1$.) Hence, the objective $W(\alpha)$ can be written
+\begin{equation*}
+    W(\alpha_1 ,\alpha_2 ,\ldots,\alpha_n ) = W((\zeta - \alpha_2 y^{(2)} )y^{(1)} ,\alpha_2 ,\ldots,\alpha_n ).
+\end{equation*}
+Treating $\alpha_3 ,\ldots,\alpha_n$ as constants, you should be able to verify that this is
+just some quadratic function in $\alpha_2$. I.e., this can also be expressed in the
+form $a\alpha_2^2 + b\alpha_2 + c$ for some appropriate $a$, $b$, and $c$. If we ignore the ``box''
+constraints \ref{eq:smo_dual_st1} (or, equivalently, that $L \le \alpha_2 \le H$), then we can easily
+maximize this quadratic function by setting its derivative to zero and solving.
+We'll let $\alpha^{\text{new,unclipped}}_2$
+denote the resulting value of $\alpha_2$. You should also be
+able to convince yourself that if we had instead wanted to maximize $W$ with
+respect to $\alpha_2$ but subject to the box constraint, then we can find the resulting
+value optimal simply by taking $\alpha^{\text{new,unclipped}}_2$
+and ``clipping'' it to lie in the $[L,H]$ interval, to get
+\begin{equation*}
+    \alpha^\text{new}_2 = \begin{cases}
+        H & \text{if } \alpha^\text{new,unclipped}_2 > H\\
+        \alpha^\text{new,unclipped}_2 & \text{if } L \le \alpha^\text{new,unclipped}_2 \le H\\
+        L & \text{if } \alpha^\text{new,unclipped}_2 < L
+    \end{cases}
+\end{equation*}
+Finally, having found the $\alpha^\text{new}_2$, we can use \cref{eq:alpha_zeta} to go back and find
+the optimal value of $\alpha^\text{new}_1$.
+
+There're a couple more details that are quite easy but that we'll leave you
+to read about yourself in Platt's paper: One is the choice of the heuristics
+used to select the next $\alpha_i , \alpha_j$ to update; the other is how to update $b$ as the
+SMO algorithm is run.

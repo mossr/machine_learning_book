@@ -96,7 +96,7 @@
 
 \usepackage[pgfplots]{juliaplots.sty/juliaplots}
 \setpythontexpygopt{style=algforopt}
-\pgfplotsset{compat=newest}
+\pgfplotsset{compat=1.8}
 \pgfplotsset{every axis legend/.append style={legend cell align=left, font=\footnotesize, draw=none, fill=none}}
 \pgfplotsset{every axis/.append style={axis background/.style={fill=white}}}
 \pgfplotsset{every tick label/.append style={font=\footnotesize}}

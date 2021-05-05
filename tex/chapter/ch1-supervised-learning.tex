@@ -4,7 +4,7 @@
 \part{Supervised Learning} % DIFF: top-level "part" is Supervised Learning (while "Linear Regression" is a chapter)
 \label{part:supervised_learning}
 
-\marginnote{From CS229 Fall 2020, Tengyu Ma, Andrew Ng \& Chris R\'e, Stanford University.}
+\marginnote{From CS229 Fall 2020, Tengyu Ma, Andrew Ng, Moses Charikar, \& Christopher R\'e, Stanford University.}
 
 
 Let's start by talking about a few examples of supervised learning problems.
@@ -706,3 +706,522 @@ training example.
 
 \titlespacing*{\part}{0pt}{50pt}{40pt} % RESTORE
 \titlespacing*{\chapter}{0pt}{50pt}{40pt} % RESTORE
+
+We could approach the classification problem ignoring the fact that $y$ is
+discrete-valued, and use our old linear regression algorithm to try to predict
+$y$ given $x$. However, it is easy to construct examples where this method
+performs very poorly. Intuitively, it also doesn't make sense for $h_\theta (x)$ to take
+values larger than 1 or smaller than 0 when we know that $y \in \{0,1\}$.
+
+To fix this, let's change the form for our hypotheses $h_\theta (x)$. We will choose
+\[
+h_\theta (x) = g(\theta^\top x) = \frac{1}{1 + e^{-\theta^\top x}}
+\]
+where
+\[
+g(z) = \frac{1}{1 + e^{-z}}
+\]
+is called the \textbf{logistic function} or the \textbf{sigmoid function}. Here is a plot
+showing $g(z)$:
+
+\begin{figure}
+    \caption{
+        \label{fig:sigmoid} Sigmoid function (i.e. logistic).
+    }
+    \begin{jlcode}
+    p = let
+        σ(z) = 1/(1 + exp(-z))
+        X = -5:0.1:5
+        Plots.Linear(X, σ.(X), style="blue, no marks")
+    end
+    plot(p)
+    \end{jlcode}
+    \begin{center}
+        \plot{fig/sigmoid}
+    \end{center}
+\end{figure}
+
+Notice that $g(z)$ tends towards 1 as $z \to \infty$, and $g(z)$ tends towards 0 as
+$z \to -\infty$. Moreover, $g(z)$, and hence also $h(x)$, is always bounded between
+0 and 1. As before, we are keeping the convention of letting $x_0 = 1$, so that $\theta^top x = \theta_0 + \sum_{j=1}^{d} \theta_j x_j$.
+
+For now, let's take the choice of $g$ as given. Other functions that smoothly
+increase from 0 to 1 can also be used, but for a couple of reasons that we'll see
+later (when we talk about GLMs, and when we talk about generative learning
+algorithms), the choice of the logistic function is a fairly natural one. Before
+moving on, here's a useful property of the derivative of the sigmoid function,
+which we write as $g'$:
+\begin{align}
+    g'(z) &= \frac{d}{dz}\frac{1}{1 + e^{-z}}\\
+    &= \frac{1}{(1 + e^{-z})^2} (e^{-z})\\
+    &= \frac{1}{(1 + e^{-z})} \cdot \left( 1 - \frac{1}{(1 + e^{-z})} \right)\\
+    &= g(z)(1 - g(z))
+\end{align}
+
+So, given the logistic regression model, how do we fit $\theta$ for it? Following
+how we saw least squares regression could be derived as the maximum like-lihood
+estimator under a set of assumptions, let's endow our classification
+model with a set of probabilistic assumptions, and then fit the parameters
+via maximum likelihood.
+
+Let us assume that
+\begin{align*}
+    P(y = 1 \mid x;\theta) &= h_\theta (x)\\
+    P(y = 0 \mid x;\theta) &= 1 - h_\theta (x)
+\end{align*}
+Note that this can be written more compactly as
+\begin{equation}
+    p(y \mid x;\theta) = (h_\theta (x))^y (1 - h_\theta (x))^{1-y}
+\end{equation}
+Assuming that the $n$ training examples were generated independently, we
+can then write down the likelihood of the parameters as
+\begin{align}
+    L(\theta) &= p(\vec y \mid X;\theta)\\
+    &= \prod^n_{i=1} p(y^{(i)} \mid x^{(i)} ;\theta)\\
+    &= \prod^n_{i=1} \left( h_\theta(x^{(i)}) \right)^{y^{(i)}} \left( 1 - h_\theta (x^{(i)}) \right)^{1-y^{(i)}}
+\end{align}
+As before, it will be easier to maximize the log likelihood:
+\begin{align}
+    \ell(\theta) &= \log L(\theta)\\
+    &= \sum_{i=1}^n y^{(i)} \log h(x^{(i)}) + (1 - y^{(i)})\log(1 - h(x^{(i)}))
+\end{align}
+
+How do we maximize the likelihood? Similar to our derivation in the case
+of linear regression, we can use gradient ascent. Written in vectorial notation,
+our updates will therefore be given by $\theta := \theta + \alpha \nabla_\theta \ell(\theta)$. (Note the positive
+rather than negative sign in the update formula, since we're maximizing,
+rather than minimizing, a function now.) Let's start by working with just
+one training example $(x,y)$, and take derivatives to derive the stochastic
+gradient ascent rule:
+\begin{align}
+    \frac{\partial}{\partial \theta_j}\ell(\theta) &=
+    \left(y \frac{1}{g(\theta^\top x)} - (1-y) \frac{1}{1-g(\theta^\top x)} \right) \frac{\partial}{\partial \theta_j}g(\theta^\top x)\\
+    &= \left(y \frac{1}{g(\theta^\top x)} - (1-y) \frac{1}{1-g(\theta^\top x)} \right) g(\theta^\top x) (1 - g(\theta^\top x)) \frac{\partial}{\partial \theta_j}\theta^\top x\\
+    &= \left(y (1 - g(\theta^\top x)) - (1-y) g(\theta^\top x)\right) x_j\\
+    &= (y - h_\theta(x)) x_j
+\end{align}
+Above, we used the fact that $g'(z) = g(z)(1 - g(z))$. This therefore gives us
+the stochastic gradient ascent rule
+\begin{equation}
+    \theta_j := \theta_j + \alpha \left( y^{(i)} - h_\theta (x^{(i)}) \right) x^{(i)}_j
+\end{equation}
+If we compare this to the LMS update rule, we see that it looks identical; but
+this is not the same algorithm, because $h_\theta (x^{(i)})$ is now defined as a non-linear
+function of $\theta^\top x^{(i)}$. Nonetheless, it's a little surprising that we end up with
+the same update rule for a rather different algorithm and learning problem.
+Is this coincidence, or is there a deeper reason behind this? We'll answer this
+when we get to GLM models.
+
+
+\section{Digression: The perceptron learning algorithm} % TYPO: algorithn
+We now digress to talk briefly about an algorithm that's of some historical
+interest, and that we will also return to later when we talk about learning
+theory. Consider modifying the logistic regression method to ``force'' it to
+output values that are either 0 or 1 or exactly. To do so, it seems natural to
+change the definition of g to be the threshold function:
+\begin{equation}
+    g(z) = \begin{cases}
+        1 & \text{if } z \ge 0\\
+        0 & \text{if } z < 0
+    \end{cases}
+\end{equation}
+If we then let $h_\theta (x) = g(\theta^\top x)$ as before but using this modified definition of
+$g$, and if we use the update rule
+\begin{equation}
+    \theta_j := \theta_j + \alpha \left( y^{(i)} - h_\theta (x^{(i)} ) \right) x^{(i)}_j    
+\end{equation}
+then we have the perceptron learning algorithm. % TYPO.
+
+In the 1960s, this ``perceptron'' was argued to be a rough model for how
+individual neurons in the brain work. Given how simple the algorithm is, it
+will also provide a starting point for our analysis when we talk about learning
+theory later in this class. Note however that even though the perceptron may
+be cosmetically similar to the other algorithms we talked about, it is actually
+a very different type of algorithm than logistic regression and least squares
+linear regression; in particular, it is difficult to endow the perceptron's predic-
+tions with meaningful probabilistic interpretations, or derive the perceptron
+as a maximum likelihood estimation algorithm.
+
+
+\section{Another algorithm for maximizing $\ell(\theta)$}
+
+Returning to logistic regression with $g(z)$ being the sigmoid function, let's
+now talk about a different algorithm for maximizing $\ell(\theta)$.
+
+To get us started, let's consider Newton's method for finding a zero of a
+function. Specifically, suppose we have some function $f : \mathbb R \mapsto \mathbb R$, and we
+wish to find a value of $\theta$ so that $f(\theta) = 0$. Here, $\theta \in \mathbb R$ is a real number.
+Newton's method performs the following update:
+\begin{equation}
+    \theta := \theta - \frac{f(\theta)}{f'(\theta)}
+\end{equation}
+This method has a natural interpretation in which we can think of it as
+approximating the function $f$ via a linear function that is tangent to $f$ at
+the current guess $\theta$, solving for where that linear function equals to zero, and
+letting the next guess for $\theta$ be where that linear function is zero.
+
+Here's a picture of the Newton's method in action:
+\begin{figure*}
+    \caption{
+        \label{fig:newtons_method} Newton's method for two steps.
+    }
+    \begin{jlcode}
+    p = plot_newtons_method()
+    plot(p)
+    \end{jlcode}
+    \begin{center}
+        \plot{fig/newtons_method}
+    \end{center}
+\end{figure*}
+
+In the leftmost figure, we see the function f plotted along with the line
+$y = 0$. We're trying to find $\theta$ so that $f(\theta) = 0$; the value of $\theta$ that achieves this
+is about 1.3. Suppose we initialized the algorithm with $\theta = 4.5$. Newton's
+method then fits a straight line tangent to $f$ at $\theta = 4.5$, and solves for the
+where that line evaluates to 0. (Middle figure.) This give us the next guess
+for $\theta$, which is about 2.8. The rightmost figure shows the result of running
+one more iteration, which the updates $\theta$ to about 1.8. After a few more
+iterations, we rapidly approach $\theta = 1.3$.
+
+Newton's method gives a way of getting to $f(\theta) = 0$. What if we want to
+use it to maximize some function $\ell$? The maxima of $\ell$ correspond to points
+where its first derivative $\ell'(\theta)$ is zero. So, by letting $f(\theta) = \ell'(\theta)$, we can use
+the same algorithm to maximize $\ell$, and we obtain update rule:
+\begin{equation}
+    \theta := \theta - \frac{\ell'(\theta)}{\ell^{\prime\prime}(\theta)}.
+\end{equation}
+(Something to think about: How would this change if we wanted to use
+Newton's method to minimize rather than maximize a function?)
+
+Lastly, in our logistic regression setting, $\theta$ is vector-valued, so we need to
+generalize Newton's method to this setting. The generalization of Newton's
+method to this multidimensional setting (also called the Newton-Raphson
+method) is given by:
+\begin{equation}
+    \theta := \theta - H^{-1} \nabla_\theta \ell(\theta).
+\end{equation}
+Here, $\nabla_\theta \ell(\theta)$ is, as usual, the vector of partial derivatives of $\ell(\theta)$ with respect
+to the $\theta_i$'s; and $H$ is an $d$-by-$d$ matrix (actually, $d+1$-by-$d+1$, assuming that
+we include the intercept term) called the \textbf{Hessian}, whose entries are given by
+\begin{equation}
+    H ij = \frac{\partial^2 \ell(\theta)}{\partial\theta_i \partial\theta_j}.
+\end{equation}
+
+Newton's method typically enjoys faster convergence than (batch) gradient
+descent, and requires many fewer iterations to get very close to the
+minimum. One iteration of Newton's can, however, be more expensive than
+one iteration of gradient descent, since it requires finding and inverting an
+$d$-by-$d$ Hessian; but so long as $d$ is not too large, it is usually much faster
+overall. When Newton's method is applied to maximize the logistic regression
+log likelihood function $\ell(\theta)$, the resulting method is also called \textbf{Fisher
+scoring}.
+
+
+
+\chapter{Generalized Linear Models}
+
+\marginnote{The presentation of the material in this section takes inspiration from Michael I.
+Jordan, \textit{Learning in graphical models} (unpublished book draft), and also McCullagh and
+Nelder, \textit{Generalized Linear Models} (2nd ed.).}
+
+So far, we've seen a regression example, and a classification example. In the
+regression example, we had $y \mid x; \theta \sim \mathcal{N}(\mu, \sigma^2)$, and in the classification one,
+$y \mid x; \theta \sim \operatorname{Bernoulli}(\phi)$, for some appropriate definitions of $\mu$ and $\phi$ as functions
+of $x$ and $\theta$. In this section, we will show that both of these methods are
+special cases of a broader family of models, called \textit{Generalized Linear Models}
+(GLMs). We will also show how other models in the GLM family can be
+derived and applied to other classification and regression problems.
+
+\section{The exponential family}
+To work our way up to GLMs, we will begin by defining exponential family
+distributions. We say that a class of distributions is in the exponential family
+if it can be written in the form:
+\[
+p(y; \eta) = b(y)\exp(\eta^\top T(y) - a(\eta)) \label{eq:glm}
+\]
+Here, $\eta$ is called the \textbf{natural parameter} (also called the \textbf{canonical parameter})
+of the distribution; $T(y)$ is the \textbf{sufficient statistic} (for the distributions
+we consider, it will often be the case that $T(y) = y$); and $a(\eta)$ is the \textbf{log
+partition function}. The quantity $e^{-a(\eta)}$ essentially plays the role of a normalization
+constant, that makes sure the distribution $p(y;\eta)$ sums/integrates
+over $y$ to 1.
+\marginnote{MLE w.r.t. $\eta$ is concave $\rightarrow$ (neg. log-likelihood is convex)}
+
+A fixed choice of $T$, $a$ and $b$ defines a family (or set) of distributions that
+is parameterized by $\eta$; as we vary $\eta$, we then get different distributions within
+this family.
+
+We now show that the Bernoulli and the Gaussian distributions are examples
+of exponential family distributions. The Bernoulli distribution with
+mean $\phi$, written $\operatorname{Bernoulli}(\phi)$, specifies a distribution over $y \in \{0,1\}$, so that
+$p(y = 1;\phi) = \phi; p(y = 0;\phi) = 1 - \phi$. As we vary $\phi$, we obtain Bernoulli
+distributions with different means. We now show that this class of Bernoulli
+distributions, ones obtained by varying $\phi$, is in the exponential family; i.e.,
+that there is a choice of $T$, $a$ and $b$ so that \ref{eq:glm} becomes exactly the
+class of Bernoulli distributions.
+
+We write the Bernoulli distribution as:
+\begin{align}
+    p(y;\phi) &= \phi^y (1 - \phi)^{1-y}\\
+              &= \exp(y \log\phi + (1 - y)\log(1 - \phi))\\
+              &= \exp\left( y\left( \log\left(\frac{\phi}{1-\phi}\right)\right) + \log(1-\phi)\right).
+\end{align}
+Thus, the natural parameter is given by $\eta = \log(\phi/(1 - \phi))$. Interestingly, if
+we invert this definition for $\eta$ by solving for $\phi$ in terms of $\eta$, we obtain $\phi =
+1/(1 + e^{-\eta})$. This is the familiar sigmoid function! This will come up again
+when we derive logistic regression as a GLM. To complete the formulation
+of the Bernoulli distribution as an exponential family distribution, we also
+have:
+\begin{align*}
+    T(y) &= y\\
+    a(\eta) &= -\log(1 - \phi)\\
+            &= \log(1 + e^{\eta})\\
+    b(y) &= 1    
+\end{align*}
+This shows that the Bernoulli distribution can be written in the form of
+\ref{eq:glm}, using an appropriate choice of $T$, $a$ and $b$.
+
+Let's now move on to consider the Gaussian distribution. Recall that,
+when deriving linear regression, the value of $\sigma^2$ had no effect on our final
+choice of $\theta$ and $h_\theta (x)$. Thus, we can choose an arbitrary value for $\sigma^2$ without
+changing anything. To simplify the derivation below, let's set $\sigma^2 = 1$.\footnote{If we leave $\sigma^2$ as a variable, the Gaussian distribution can also be shown to be in the exponential family, where $\eta \in \mathbb R^2$ is now a 2-dimension vector that depends on both $\mu$ and
+$\sigma$. For the purposes of GLMs, however, the $\sigma^2$ parameter can also be treated by considering
+a more general definition of the exponential family: $p(y;\eta,\tau) = b(a,\tau)\exp((\eta^\top T(y) - a(\eta))/c(\tau))$.
+Here, $\tau$ is called the \textbf{dispersion parameter}, and for the Gaussian, $c(\tau) = \sigma^2$;
+but given our simplification above, we won't need the more general definition for the
+examples we will consider here.}
+We then have:
+\begin{align}
+    p(y;\mu) &= \frac{1}{\sqrt{2\pi}}\exp\left(-\frac{1}{2} (y - \mu)^2\right)\\
+             &= \frac{1}{\sqrt{2\pi}}\exp\left(-\frac{1}{2} y^2 \right) \cdot  \exp\left(\mu y - \frac{1}{2}\mu^2\right)
+\end{align}
+Thus, we see that the Gaussian is in the exponential family, with
+\begin{align*}
+    \eta &= \mu\\
+    T(y) &= y\\
+    a(\eta) &= \mu^2 / 2\\
+            &= \eta^2 / 2\\
+    b(y) &= (1 / \sqrt{2\pi})\exp(-y^2 / 2).
+\end{align*}
+There're many other distributions that are members of the exponential family:
+The multinomial (which we'll see later), the Poisson (for modelling
+count-data; also see the problem set); the gamma and the exponential
+(for modelling continuous, non-negative random variables, such as time-intervals);
+the beta and the Dirichlet (for distributions over probabilities);
+and many more. In the next section, we will describe a general ``recipe''
+for constructing models in which $y$ (given $x$ and $\theta$) comes from any of these
+distributions.
+
+
+\section{Constructing GLMs}
+\marginnote{Inference is easy:
+\[
+\mathbb E[y; \eta] = \frac{\partial}{\partial \eta} a(\eta)
+\]
+(log partition of exp. family).
+}
+Suppose you would like to build a model to estimate the number $y$ of customers
+arriving in your store (or number of page-views on your website) in
+any given hour, based on certain features $x$ such as store promotions, recent
+advertising, weather, day-of-week, etc. We know that the Poisson distribution
+usually gives a good model for numbers of visitors. Knowing this, how
+can we come up with a model for our problem? Fortunately, the Poisson is an
+exponential family distribution, so we can apply a Generalized Linear Model
+(GLM). In this section, we will we will describe a method for constructing
+GLM models for problems such as these.
+
+More generally, consider a classification or regression problem where we
+would like to predict the value of some random variable $y$ as a function of
+$x$. To derive a GLM for this problem, we will make the following three
+assumptions about the conditional distribution of $y$ given $x$ and about our
+model:
+\begin{enumerate}
+    \item $y \mid x;\theta \sim \operatorname{ExponentialFamily}(\eta)$. I.e., given $x$ and $\theta$, the distribution of
+$y$ follows some exponential family distribution, with parameter $\eta$.
+    \item Given $x$, our goal is to predict the expected value of $T(y)$ given $x$.
+    In most of our examples, we will have $T(y) = y$, so this means we
+    would like the prediction $h(x)$ output by our learned hypothesis $h$ to
+    satisfy $h(x) = \mathbb E[y \mid x]$. (Note that this assumption is satisfied in the
+    choices for $h_\theta (x)$ for both logistic regression and linear regression. For
+    instance, in logistic regression, we had $h_\theta (x) = p(y = 1 \mid x;\theta) = 0 \cdot p(y =
+        0 \mid x;\theta) + 1 \cdot p(y = 1 \mid x;\theta) = \mathbb E[y \mid x;\theta]$.)
+
+    \item The natural parameter $\eta$ and the inputs $x$ are related linearly: $\eta = \theta^\top x$.
+    (Or, if $\eta$ is vector-valued, then $\eta_i = \theta^\top_i x$.)
+\end{enumerate}
+
+The third of these assumptions might seem the least well justified of
+the above, and it might be better thought of as a ``design choice'' in our
+recipe for designing GLMs, rather than as an assumption per se. These
+three assumptions/design choices will allow us to derive a very elegant class
+of learning algorithms, namely GLMs, that have many desirable properties
+such as ease of learning. Furthermore, the resulting models are often very
+effective for modelling different types of distributions over $y$; for example, we
+will shortly show that both logistic regression and ordinary least squares can
+both be derived as GLMs.
+
+\subsection{Ordinary Least Squares}
+To show that ordinary least squares is a special case of the GLM family
+of models, consider the setting where the target variable $y$ (also called the
+\textbf{response variable} in GLM terminology) is continuous, and we model the
+conditional distribution of $y$ given $x$ as a Gaussian $\mathcal N(\mu,\sigma^2)$. (Here, $\mu$ may
+depend $x$.) So, we let the $\operatorname{ExponentialFamily}(\eta)$ distribution above be
+the Gaussian distribution. As we saw previously, in the formulation of the
+Gaussian as an exponential family distribution, we had $\mu = \eta$. So, we have
+\begin{align*}
+    h_\theta (x) &= \mathbb E[y \mid x;\theta]\\
+    &= \mu\\
+    &= \eta\\
+    &= \theta^\top x.
+\end{align*}
+The first equality follows from Assumption 2, above; the second equality
+follows from the fact that $y \mid x;\theta \sim \mathcal N(\mu,\sigma^2)$, and so its expected value is given
+by $\mu$; the third equality follows from Assumption 1 (and our earlier derivation
+showing that $\mu = \eta$ in the formulation of the Gaussian as an exponential
+family distribution); and the last equality follows from Assumption 3.
+
+\subsection{Logistic Regression}
+We now consider logistic regression. Here we are interested in binary classification,
+so $y \in \{0,1\}$. Given that $y$ is binary-valued, it therefore seems natural
+to choose the Bernoulli family of distributions to model the conditional distribution
+of $y$ given $x$. In our formulation of the Bernoulli distribution as
+an exponential family distribution, we had $\phi = 1/(1 + e^{-\eta})$. Furthermore,
+note that if $y \mid x;\theta \sim \operatorname{Bernoulli}(\phi)$, then $\mathbb E[y \mid x;\theta] = \phi$. So, following a similar
+derivation as the one for ordinary least squares, we get:
+\begin{align*}
+    h_\theta (x) &= \mathbb E[y \mid x;\theta]\\
+    &= \phi\\
+    &= 1/(1 + e^{-\eta})\\
+    &= 1/(1 + e^{-\theta^\top x})    
+\end{align*}
+So, this gives us hypothesis functions of the form $h_\theta (x) = 1/(1 + e^{-\theta^\top x})$. If
+you are previously wondering how we came up with the form of the logistic
+function $1/(1 + e^{-z})$, this gives one answer: Once we assume that $y$ conditioned
+on $x$ is Bernoulli, it arises as a consequence of the definition of GLMs
+and exponential family distributions.
+
+To introduce a little more terminology, the function $g$ giving the distribution's
+mean as a function of the natural parameter ($g(\eta) = \mathbb E[T(y); \eta]$)
+is called the \textbf{canonical response function}. Its inverse, $g^{-1}$, is called the
+\textbf{canonical link function}. Thus, the canonical response function for the
+Gaussian family is just the identity function; % TYPO? identity not "identify"?
+and the canonical response function for the Bernoulli is the logistic function.\footnote{Many texts use $g$ to denote the link function, and $g^{-1}$
+to denote the response function; but the notation we're using here, inherited from the early machine learning literature,
+will be more consistent with the notation used in the rest of the class.}
+
+\subsection{Softmax Regression}
+Let's look at one more example of a GLM. Consider a classification problem
+in which the response variable $y$ can take on any one of $k$ values, so $y \in
+\{1,2,\ldots,k\}$. For example, rather than classifying email into the two classes
+spam or not-spam---which would have been a binary classification problem---
+we might want to classify it into three classes, such as spam, personal mail,
+and work-related mail. The response variable is still discrete, but can now
+take on more than two values. We will thus model it as distributed according
+to a multinomial distribution.
+
+Let's derive a GLM for modelling this type of multinomial data. To do
+so, we will begin by expressing the multinomial as an exponential family
+distribution.
+
+To parameterize a multinomial over $k$ possible outcomes, one could use
+$k$ parameters $\phi_1 ,\ldots,\phi_k$ specifying the probability of each of the outcomes.
+However, these parameters would be redundant, or more formally, they would
+not be independent (since knowing any $k-1$ of the $\phi_i$'s uniquely determines
+the last one, as they must satisfy $\sum_{i=1}^k \phi_i = 1$). So, we will instead parameterize
+the multinomial with only $k - 1$ parameters, $\phi_1,\ldots,\phi_{k-1}$, where
+$\phi_i = p(y = i;\phi)$, and $p(y = k;\phi) = 1 - \sum_{i=1}^{k-1} \phi_i$. For notational convenience,
+we will also let $\phi_k = 1 - \sum_{i=1}^{k-1} \phi_i$, but we should keep in mind that this is
+not a parameter, and that it is fully specified by $\phi_1,\ldots,\phi_{k-1}$.
+
+To express the multinomial as an exponential family distribution, we will
+define $T(y) \in \mathbb R^{k-1}$ as follows:
+\begin{equation*}
+    T(1) = \begin{bmatrix}1\\0\\0\\\vdots\\0\end{bmatrix},
+    T(2) = \begin{bmatrix}0\\1\\0\\\vdots\\0\end{bmatrix},
+    \cdots,
+    T(k-1) = \begin{bmatrix}0\\0\\0\\\vdots\\1\end{bmatrix},
+    T(k) = \begin{bmatrix}0\\0\\0\\\vdots\\0\end{bmatrix},
+\end{equation*}
+Unlike our previous examples, here we do \textit{not} have $T(y) = y$; also, $T(y)$ is
+now a $k - 1$ dimensional vector, rather than a real number. We will write
+$(T(y))_i$ to denote the $i$-th element of the vector $T(y)$.
+We introduce one more very useful piece of notation. An indicator function
+$\mathbb{1}\{\cdot\}$ takes on a value of 1 if its argument is true, and 0 otherwise
+($\mathbb{1}\{\texttt{True}\} = 1$, $\mathbb{1}\{\texttt{False}\} = 0$). For example, $\mathbb{1}\{2 = 3\} = 0$, and $\mathbb{1}\{3 =
+5 - 2\} = 1$. So, we can also write the relationship between $T(y)$ and $y$ as
+$(T(y))_i = \mathbb{1}\{y = i\}$. (Before you continue reading, please make sure you understand
+why this is true!) Further, we have that $\mathbb E[(T(y))_i] = P(y = i) = \phi_i$.
+
+We are now ready to show that the multinomial is a member of the
+exponential family. We have:
+\begin{align*}
+    p(y; \phi) &= \phi_1^{\mathbb{1}\{y=1\}} \phi_2^{\mathbb{1}\{y=2\}} \cdots \phi_k^{\mathbb{1}\{y=k\}}\\
+               &= \phi_1^{\mathbb{1}\{y=1\}} \phi_2^{\mathbb{1}\{y=2\}} \cdots \phi_k^{1 - \sum_{i=1}^{k-1}\mathbb{1}\{y=i\}}\\
+               &= \phi_1^{(T(y))_1} \phi_2^{(T(y))_2} \cdots \phi_k^{1 - \sum_{i=1}^{k-1}(T(y))_i}\\
+               &= \exp\left((T(y))_i \log(\phi_1) + (T(y))_2 \log(\phi_2) + \cdots + \left(1 - \sum_{i=1}^{k-1} (T(y))_i \right) \log(\phi_k) \right)\\
+               &= \exp\left((T(y))_i \log(\phi_1/\phi_k) + (T(y))_2 \log(\phi_2/\phi_k) + \cdots + (T(k))_{k-1} \log(\phi_{k-1}/\phi_k) + \log(\phi_k)\right)\\
+               &= b(y) \exp(\eta^\top T(y) - a(\eta))
+\end{align*}
+where
+\begin{align*}
+    \eta &= \begin{bmatrix} \log(\phi_1 / \phi_k) \\ \log(\phi_2 / \phi_k) \\ \vdots \\ \log(\phi_{k-1}/\phi_k) \end{bmatrix},\\
+    a(\eta) &= - \log(\phi_k)\\
+    b(y) &= 1.
+\end{align*}
+This completes our formulation of the multinomial as an exponential family
+distribution.
+
+The link function is given (for $i = 1,\ldots,k$) by:
+\[
+\eta_i = \log \frac{\phi_i}{\phi_k}
+\]
+For convenience, we have also defined $\eta_k = \log(\phi_k / \phi_k) = 0$. To invert the
+link function and derive the response function, we therefore have that
+\begin{align}
+    e^{\eta_i} &= \frac{\phi_i}{\phi_k}\\
+    \phi_k e^{\eta_i} &= \phi_i\label{eq:resp_fnc}\\
+    \phi_k \sum_{i=1}^k e^{\eta_i} &= \sum_{i=1}^k \phi_i = 1
+\end{align}
+This implies that $\phi_k = 1 / \sum_{i=1}^k e^{\eta_i}$, which can be substituted back into \cref{eq:resp_fnc} to give the response function
+\[
+\phi_i = \frac{e^{\eta_i}}{\sum_{j=1}^k e^{\eta_j}}
+\]
+This function mapping from the $\eta$'s to the $\phi$'s is called the \textbf{softmax} function.
+
+To complete our model, we use Assumption 3, given earlier, that the $\eta_i$'s
+are linearly related to the $x$'s. So, have $\eta_i = \theta^\top_i x$ (for $i = 1,\ldots, k-1$),
+where $\theta_1,\ldots, \theta_{k-1} \in \mathbb R^{d+1}$ are the parameters of our model. For notational
+convenience, we can also define $\theta_k = 0$, so that $\eta_k = \theta^\top_k x = 0$, as given
+previously. Hence, our model assumes that the conditional distribution of $y$
+given $x$ is given by:
+\begin{align}
+    p(y=1 \mid x; \theta) &= \phi_i\\
+                          &= \frac{e^{\eta_i}}{\sum_{j=1}^k e^{\eta_j}}\\
+                          &= \frac{e^{\theta^\top_i x}}{\sum_{j=1}^k e^{\theta^\top_j x}} \label{eq:cond_distr}
+\end{align}
+This model, which applies to classification problems where $y \in \{1,...,k\}$, is
+called \textbf{softmax regression}. It is a generalization of logistic regression.
+
+Our hypothesis will output:
+\begin{align}
+    h_\theta(x) &= \mathbb E \left[ T(y) \mid x; \theta \right]\\
+                &= \mathbb E \left[\begin{matrix}\mathbb{1}\{y=1\}\\\mathbb{1}\{y=2\}\\\vdots\\\mathbb{1}\{y=k-1\}\end{matrix} \mid x; \theta \right]\\    
+                &= \begin{bmatrix}\phi_1\\\phi_2\\\vdots\\\phi_{k-1}\end{bmatrix}\\
+                &= \begin{bmatrix}\frac{\exp(\theta^\top_1 x)}{\sum_{j=1}^k \exp(\theta^\top_j x)}\\\frac{\exp(\theta^\top_2 x)}{\sum_{j=1}^k \exp(\theta^\top_j x)}\\\vdots\\\frac{\exp(\theta^\top_{k-1} x)}{\sum_{j=1}^k \exp(\theta^\top_j x)}\end{bmatrix}
+\end{align}
+In other words, our hypothesis will output the estimated probability that
+$p(y = i \mid x;\theta)$, for every value of $i = 1,\ldots,k$. (Even though $h_\theta (x)$ as defined
+above is only $k - 1$ dimensional, clearly $p(y = k \mid x;\theta)$ can be obtained as $1 - \sum^{k-1}_{i=1} \phi_i$.)
+
+Lastly, let's discuss parameter fitting. Similar to our original derivation
+of ordinary least squares and logistic regression, if we have a training set of
+$n$ examples $\{(x^{(i)} ,y^{(i)} );i = 1,\ldots,n\}$ and would like to learn the parameters
+$\theta_i$ of this model, we would begin by writing down the log-likelihood
+\begin{align}
+    \ell(\theta) &= \sum_{i=1}^n \log p(y^{(i)} \mid x^{(i)}; \theta)\\
+                 &= \sum_{i=1}^n \log \prod_{l=1}^k \left( \frac{e^{\theta^\top_l x^{(i)}}}{\sum_{j=1}^k e^{\theta^\top_j x^{(i)}}} \right) ^{\mathbb{1}\{y^{(i)} = l\}}
+\end{align}
+To obtain the second line above, we used the definition for $p(y \mid x;\theta)$ given
+in \ref{eq:cond_distr}. We can now obtain the maximum likelihood estimate of
+the parameters by maximizing $\ell(\theta)$ in terms of $\theta$, using a method such as
+gradient ascent or Newton's method.

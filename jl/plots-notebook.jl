@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.12.18
+# v0.12.20
 
 using Markdown
 using InteractiveUtils
@@ -15,6 +15,9 @@ using CSV
 
 # ╔═╡ f5f028a0-6a35-11eb-33fa-f3b07ad5b5c6
 using LinearAlgebra
+
+# ╔═╡ 41928830-9659-11eb-34ee-134854f44e89
+using SymEngine
 
 # ╔═╡ 73c2d230-69ca-11eb-0501-3f5888d0ba3a
 include("gradient_descent.jl")
@@ -146,6 +149,70 @@ begin
 	g
 end	
 
+# ╔═╡ 22baebb0-9644-11eb-181d-cf8789e088e4
+md"""
+Newton's method
+"""
+
+# ╔═╡ 913f2630-965a-11eb-192d-b7f8b28c771f
+# Define tangent line: y = m*(x - x1) + y1
+function tangent(m, x, x1, y1)
+    return m*(x .- x1) .+ y1
+end
+
+# ╔═╡ a84f6290-965a-11eb-343c-91a95c32bc18
+tangent(4*4.5, [2.5:0.1:5;], 4.5, 36.5)
+
+# ╔═╡ 669fbfe0-9644-11eb-30ef-298e902dc4c2
+function plot_newtons_method()
+    @vars x
+    f = x -> 2x^2 - 4
+    f′ = diff(2x^2 - 4, x)
+    origin = Plots.Linear([1, 5], [0, 0], style="black, no marks")
+    loss = Plots.Linear(f, (1,5), style="blue")
+
+    x1 = 4.5
+    Y::Vector{Float64} = tangent.(f′(x1), [1:5;], x1, f(x1))
+    nm1_vert = Plots.Linear([x1, x1], [-10, f(x1)], style="red, dotted, no marks")
+    nm1_vert_pt = Plots.Scatter([x1], [f(x1)], style="red", mark="*")
+    nm1_tan = Plots.Linear([1:5;], Y, style="red, solid", mark="none")
+
+    x2 = 2.472225 # approx
+    nm1_zero_pt = Plots.Scatter([x2], [0.0], style="red, solid", mark="o")
+
+    Y2::Vector{Float64} = tangent.(f′(x2), [1:5;], x2, f(x2))
+    nm2_vert = Plots.Linear([x2, x2], [-10, f(x2)], style="purple, dotted, no marks")
+    nm2_vert_pt = Plots.Scatter([x2], [f(x2)], style="purple, fill=purple", mark="*")
+    nm2_tan = Plots.Linear([1:5;], Y2, style="purple, solid", mark="none")
+    
+    x3 = 1.64052 # appox
+    nm2_zero_pt = Plots.Scatter([x3], [0.0], style="purple, solid", mark="o")
+    
+    g = GroupPlot(3, 1, style="width=0.3\\textwidth")
+    push!(g, Axis([origin, loss], xmin=1, xmax=5, ymin=-10, ymax=60, xlabel=L"x", ylabel=L"f(x)"))
+    push!(g, Axis([origin, loss, nm1_vert, nm1_vert_pt, nm1_zero_pt, nm1_tan], xmin=1, xmax=5, ymin=-10, ymax=60, xlabel=L"x"))
+    push!(g, Axis([origin, loss, nm1_vert, nm1_tan, nm2_vert, nm2_vert_pt, nm2_tan, nm2_zero_pt, nm1_vert_pt, nm1_zero_pt], xmin=1, xmax=5, ymin=-10, ymax=60, xlabel=L"x"))
+
+    # NOTE: Bug when plots are in this order below. The filled purple turns into a filled gray mark.
+    # push!(g, Axis([origin, loss, nm1_vert, nm1_vert_pt, nm1_zero_pt, nm1_tan, nm2_vert, nm2_vert_pt, nm2_tan, nm2_zero_pt], xmin=1, xmax=5, ymin=-10, ymax=60, xlabel=L"x"))
+    return g
+end
+
+# ╔═╡ 70abcdee-965b-11eb-3c1b-a1329f72e3c7
+tangent(4*4.5, 2.472225, 4.5, 36.5)
+
+# ╔═╡ a1f5f2e2-965c-11eb-23bb-7134b836296b
+tangent(4*2.472225, 1.64052, 2.472225, 2*2.472225^2 - 4)
+
+# ╔═╡ bfb58920-9644-11eb-0e7b-133e428223f4
+fp = plot_newtons_method()
+
+# ╔═╡ 33d67960-9b43-11eb-2aa1-538e79d1e1b6
+save("newton.tex", fp)
+
+# ╔═╡ e8632700-9659-11eb-375d-e5071cf7d225
+(4.5, 2*4.5^2 - 4)
+
 # ╔═╡ Cell order:
 # ╠═92728d70-69b5-11eb-2c45-33f34641f0a8
 # ╠═62598390-69b6-11eb-19b7-119b6c33cf22
@@ -176,3 +243,13 @@ end
 # ╠═e61b1e80-6a35-11eb-14a8-d9fe9bba73b1
 # ╠═b02640c0-6a35-11eb-2be3-75294c4b2a0a
 # ╠═c94a1ae0-6a35-11eb-14d8-51ccabc7fc6d
+# ╠═22baebb0-9644-11eb-181d-cf8789e088e4
+# ╠═41928830-9659-11eb-34ee-134854f44e89
+# ╠═913f2630-965a-11eb-192d-b7f8b28c771f
+# ╠═a84f6290-965a-11eb-343c-91a95c32bc18
+# ╠═669fbfe0-9644-11eb-30ef-298e902dc4c2
+# ╠═70abcdee-965b-11eb-3c1b-a1329f72e3c7
+# ╠═a1f5f2e2-965c-11eb-23bb-7134b836296b
+# ╠═bfb58920-9644-11eb-0e7b-133e428223f4
+# ╠═33d67960-9b43-11eb-2aa1-538e79d1e1b6
+# ╠═e8632700-9659-11eb-375d-e5071cf7d225

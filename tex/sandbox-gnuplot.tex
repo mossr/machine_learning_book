@@ -1,0 +1,70 @@
+% Compilation process:
+% make sandbox
+
+\documentclass[fullbook]{tufte_algorithms_book}
+
+\input{preamble}
+
+\title{Sandbox for Computer Scientists}
+\author[Moss]{Robert J. Moss}
+\date{2020}
+
+\begin{document}
+
+\begin{jlcode}
+	include("../../jl/support_code.jl")
+\end{jlcode}
+
+%% Change this to include the tex file of your choice.
+% \include{chapter/ch2-machine-learning-i}
+
+\begin{figure}
+    % \vspace{-1in}
+    \resizebox{1.2\columnwidth}{!}{%
+    \begin{tikzpicture}
+    \begin{axis}[
+        title={$x \exp(-x^2-y^2)$}, 
+        xlabel=$x$, ylabel=$y$,
+        small,
+        grid=both,
+        ytick={-1, 0, 1, 2},
+    ]
+
+    \newcommand\expr[2]{exp(-#1^2) * sin(deg(#2))}
+
+    % Contour projection (needs gnuplot executables)
+    \addplot3[
+        % colormap/viridis,
+        colormap={reverse viridis}{ indices of colormap={ \pgfplotscolormaplastindexof{viridis},...,0 of viridis} },
+        contour gnuplot={
+            % cdata should not be affected by z filter:
+            output point meta=rawz,
+            number=10,
+            labels=false, % removes values
+        },
+        domain=-2:2,
+        domain y=-2:2,
+        samples=41,
+        z filter/.code=\def\pgfmathresult{-0.5},
+    ]
+        {exp(-x^2-y^2)*x};
+
+    % Surface plot
+    \addplot3[
+        surf,
+        % colormap/viridis,
+        colormap={reverse viridis}{ indices of colormap={ \pgfplotscolormaplastindexof{viridis},...,0 of viridis} },
+        domain=-2:2,
+        domain y=-2:2,
+    ] 
+        {exp(-x^2-y^2)*x};
+
+    % \addplot3[surf]{exp(-x^2-y^2)*x};
+
+    \end{axis}
+    \end{tikzpicture}
+    }%
+\end{figure}
+
+
+\end{document}
