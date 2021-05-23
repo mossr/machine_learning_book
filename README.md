@@ -16,42 +16,34 @@ Install LaTeX via texlive. We recommend [this repo](https://github.com/scottkost
 
 Clone the repository to a location of your choosing:
 ```
-git clone https://github.com/mossr/ml_algorithms_book.git
+git clone https://github.com/mossr/machine_learning_book.git
 ```
 
-Initialize and update the submodules:
+Initialize and update the submodule ([juliaplots.sty](https://github.com/sisl/juliaplots.sty)):
 ```
 git submodule init
 git submodule update
 ```
 
-Compile the style:
+Install lexer and style (may need `pip3` instead):
 ```
-cd style
-sudo python setup.py install
-cd ..
-```
-
-Compile the lexer:
-```
-cd lexer
-sudo python setup.py install
-cd ..
+pip install --upgrade git+https://github.com/sisl/pygments-julia#egg=pygments_julia
+pip install --upgrade git+https://github.com/sisl/pygments-style-algfordm#egg=pygments_style_algforopt
 ```
 
 Install the required Julia packages.
 ```
-make install
+julia jl/install.jl
 ```
 
 Install `pdf2svg`, which is used by PGFPlots (we assume Ubuntu - other operating systems may install pdf2svg differently):
 ```
 sudo apt-get install pdf2svg
 ```
+For `pdf2svg` on Windows (place `dist-*` directory on PATH): https://github.com/jalios/pdf2svg-windows
+
 
 Install [pgfplots](https://ctan.org/pkg/pgfplots).
-
-Install [gnuplots](http://gnuplot.info/download.html).
 
 We require pythontex 0.17, which was just recently tagged. You will probably have to update your version on texlive on miktex. Alternatively, you can download the latest version of pythontex from https://github.com/gpoore/pythontex.
 
@@ -59,18 +51,23 @@ We require pythontex 0.17, which was just recently tagged. You will probably hav
 
 ## Test
 
-Running `make test` pulls all the code and then runs all tests in `juliatest` blocks. See `runtests.jl` for details.
+Running the following pulls all the code and then runs all tests in `juliatest` blocks. See `runtests.jl` for details.
+
+```
+julia jl/runtests.jl
+```
 
 ## Compilation
 
-* `make compile` compiles the whole book (`make book` works too)
-* `make sandbox` will compile `tex/sandbox.tex` (meant for development, e.g., single files)
-* `make quick` will only run `lualatex` (skipping `pythontex` and `biber` for quick LaTeX compilation)
-	* `make quick-sandbox` does quick compilation for `tex/sandbox.tex`
-* `make clean` removes all generated files except `book.pdf` and `sandbox.pdf`
-* `make full` runs `clean` and `compile`
-	* `make full-sandbox` does full clean/compilation for `tex/sandbox.tex`
-* `make save` copies the `book.pdf` file to `p4cs.pdf`
+Install `latexmk` from: https://mg.readthedocs.io/latexmk.html#installation
+
+* `latexmk` will compile everything (see `output/` for PDF).
+    * `latexmk` will intelligently compile only the necessary bits.
+* `latexmk -c` will clean up generated files.
+* `latexmk -C` will clean up generated files (including `.pdf`).
+* `latexmk tex/sandbox.tex` will compile `tex/sandbox.tex` (Note, the forward slash is important. This is meant for development, e.g., single files)
+
+If you host your project under Gitlab, `.gitlab-ci.yml` is a CI/CD template to start with.
 
 
 If you host your project under Gitlab, `.gitlab-ci.yml` is a CI/CD template to start with.
@@ -80,7 +77,7 @@ If you host your project under Gitlab, `.gitlab-ci.yml` is a CI/CD template to s
     .
     ├── ...
     ├── jl                      # Julia framework script files
-    ├── lectures                # CS221 lecture notes
+    ├── lectures                # CS229 lecture notes
     ├── tex                     # LaTeX files (main and preamble files)
     │   └── chapter             # LaTeX files (specifically for chapters)
     │       └── figures         # TiKz figures (non-Julia generated)

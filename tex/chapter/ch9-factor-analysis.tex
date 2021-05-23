@@ -43,7 +43,8 @@ Gaussians that will be needed later; specifically, how to find marginal and
 conditonal distributions of Gaussians. Finally, we present the factor analysis
 model, and EM for it.
 
-\section{Restrictions of $\Sigma$}
+\vspace{1cm}
+\inlinechapter{Restrictions of $\Sigma$}
 If we do not have sufficient data to fit a full covariance matrix, we may
 place some restrictions on the space of matrices $\Sigma$ that we will consider. For
 instance, we may choose to fit a covariance matrix $\Sigma$ that is diagonal. In this
@@ -84,7 +85,10 @@ factor analysis model, which uses more parameters than the diagonal $\Sigma$ and
 captures some correlations in the data, but also without having to fit a full
 covariance matrix.
 
-\section{Marginals and conditionals of Gaussians}
+\vspace{1cm}
+\begin{fullwidth}
+\inlinechapter{Marginals and conditionals of Gaussians}
+\end{fullwidth}
 Before describing factor analysis, we digress to talk about how to find conditional and marginal distributions of random variables with a joint multivariate Gaussian distribution.
 
 Suppose we have a vector-valued random variable
@@ -151,7 +155,8 @@ When we work with the factor analysis model in the next section, these
 formulas for finding conditional and marginal distributions of Gaussians will
 be very useful.
 
-\section{The factor analysis model}
+\vspace{1cm}
+\inlinechapter{The factor analysis model}
 In the factor analysis model, we posit a joint distribution on $(x, z)$ as follows,
 where $z \in \mathbb R^k$ is a latent random variable:
 \begin{align*}
@@ -252,7 +257,8 @@ so in closed-form. So, we will instead use to the EM algorithm. In the next
 section, we derive EM for factor analysis.
 
 
-\section{EM for factor analysis}
+\vspace{1cm}
+\inlinechapter{EM for factor analysis}
 The derivation for the E-step is easy. We need to compute $Q_i(z^{(i)}) = p(z^{(i)} \mid x^{(i)}; \mu ,\Lambda , \Psi)$.
 By substituting the distribution given in \cref{eq:joint_gaussian}
 into the formulas \ref{eq:conditional_mu}-\ref{eq:conditional_Sigma} used for finding the conditional distribution of a

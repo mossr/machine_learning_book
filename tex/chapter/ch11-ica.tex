@@ -47,8 +47,8 @@ W = \begin{bmatrix}
 \]
 Thus, $w_i \in \mathbb R^d$, and the $j$-th source can be recovered as $s^{(i)}_j = w^\top_j x^{(i)}$.
 
-% TODO: Change to \chapter! (see PCA and Factor Analysis too.)
-\section{ICA ambiguities}
+\vspace{1cm}
+\inlinechapter{ICA ambiguities}
 To what degree can $W = A^{-1}$ be recovered? If we have no prior knowledge
 about the sources and the mixing matrix, it is easy to see that there are some
 inherent ambiguities in $A$ that are impossible to recover, given only the $x^{(i)}$'s.
@@ -125,7 +125,8 @@ not Gaussian, it is possible, given enough data, to recover the $d$ independent
 sources.
 
 
-\section{Densities and linear transformations}
+\vspace{1cm}
+\inlinechapter{Densities and linear transformations}
 Before moving on to derive the ICA algorithm proper, we first digress briefly
 to talk about the effect of linear transformations on densities.
 
@@ -164,7 +165,8 @@ of the inverse of a matrix is just the inverse of the determinant, we have
 $1/\operatorname{vol}(C_2) = 1/|A| = |A^{-1}| = |W|$. Thus, $p_x(x) = \mathbb{1}\{x \in C_2\}|W| = \mathbb{1}\{Wx \in
 C_1\}|W| = p_s(Wx)|W|$.
 
-\section{ICA algorithm}
+\vspace{1cm}
+\inlinechapter{ICA algorithm}
 We are now ready to derive an ICA algorithm. We describe an algorithm
 by Bell and Sejnowski, and we give an interpretation of their algorithm as a %TODO: citation.
 method for maximum likelihood estimation. (This is different from their

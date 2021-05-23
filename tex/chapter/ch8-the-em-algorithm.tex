@@ -374,7 +374,7 @@ straightforward.
 
 \vspace{1cm}
 \begin{fullwidth}
-\inlinechapter{($\dagger$) Variational inference and variational auto-encoder}\label{cha:variational}
+\inlinechapter{Variational inference and variational auto-encoder}\label{cha:variational}
 \end{fullwidth}
 Loosely speaking, variational auto-encoder\cite{kingma2013auto} generally refers to a family of
 algorithms that extend the EM algorithms to more complex models
@@ -465,10 +465,10 @@ satisfy other requirements (which happened to be satisfied by the form \ref{eq:q
 Before optimizing the ELBO, let's first verify whether we can efficiently
 evaluate the value of the ELBO for fixed $Q$ of the form \ref{eq:q_i_diag} and $\theta$. We
 rewrite the ELBO as a function of $\phi,\psi,\theta$ by:
-\begin{align}
-    \operatorname{ELBO}(\phi,\psi,\theta) &= \sum_{i=1}^n \mathbb E_{z^{(i)} \sim Q_i}\left[\log \frac{p(x^{(i)} ,z^{(i)} ;\theta)}{Q_i (z^{(i)})} \right],\label{eq:elbo_phi_psi_theta}\\
-    \text{where } Q_i = \mathcal N(q(x^{(i)} ;\phi),\operatorname{diag}(v(x^{(i)} ;\psi))^2)
-\end{align}
+\begin{equation}
+    \operatorname{ELBO}(\phi,\psi,\theta) = \sum_{i=1}^n \mathbb E_{z^{(i)} \sim Q_i}\left[\log \frac{p(x^{(i)} ,z^{(i)} ;\theta)}{Q_i (z^{(i)})} \right],\label{eq:elbo_phi_psi_theta}
+\end{equation}
+where $Q_i = \mathcal N(q(x^{(i)} ;\phi),\operatorname{diag}(v(x^{(i)} ;\psi))^2)$.
 Note that to evaluate $Q_i(z^{(i)})$ inside the expectation, we should be able \textbf{to
 compute the density} of $Q_i$. To estimate the expectation $\mathbb E_{z^{(i)} \sim Q_i}$, we
 should be able \textbf{to sample from distribution} $Q_i$ so that we can build an
@@ -513,10 +513,12 @@ $x = \mu+\xi \sigma$ with $\xi \sim \mathcal N(0,1)$. We mostly just used this f
 simultaneously for the random variable $z^{(i)} \sim Q_i$.
 
 With this re-parameterization, we have that:
-\begin{align}
-    \mathbb E_{z^{(i)} \sim Q_i} \left[\log\frac{p(x^{(i)} ,z^{(i)} ;\theta)}{Q_i(z^{(i)})}\right]\\
-        &= \mathbb E_{\xi^{(i)} \sim\mathcal N(0,1)} \left[\log \frac{p(x^{(i)} ,q(x^{(i)} ;\phi) + v(x^{(i)} ;\psi) \odot \xi^{(i)} ;\theta)}{Q_i (q(x^{(i)} ;\phi) + v(x^{(i)} ;\psi) \odot \xi^{(i)} )}\right]
-\end{align}
+\begin{fullwidth}
+\begin{equation}
+    \mathbb E_{z^{(i)} \sim Q_i} \left[\log\frac{p(x^{(i)} ,z^{(i)} ;\theta)}{Q_i(z^{(i)})}\right]
+        = \mathbb E_{\xi^{(i)} \sim\mathcal N(0,1)} \left[\log \frac{p(x^{(i)} ,q(x^{(i)} ;\phi) + v(x^{(i)} ;\psi) \odot \xi^{(i)} ;\theta)}{Q_i (q(x^{(i)} ;\phi) + v(x^{(i)} ;\psi) \odot \xi^{(i)} )}\right]
+\end{equation}
+\end{fullwidth}
 It follows that:
 \begin{align}
     \nabla_\phi& \mathbb E_{z^{(i)} \sim Q_i} \left[ \log\frac{p(x^{(i)} ,z^{(i)} ;\theta)}{Q_i(z^{(i)})}\right]\\
