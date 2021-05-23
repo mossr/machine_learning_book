@@ -146,11 +146,9 @@ space of linear functions mapping from $\cal X$ to $\cal Y$. When there is no ri
 confusion, we will drop the $\theta$ subscript in $h_\theta(x)$, and write it more simply as
 $h(x)$. To simplify our notation, we also introduce the convention of letting
 $x_0 = 1$ (this is the intercept term), so that
-
 \begin{equation}
     h(x) = \sum_{i=0}^d \theta_i x_i = \theta^\top x\text{,} % DIFF: \top instead of ^T
 \end{equation}
-
 where on the right-hand side above we are viewing $\theta$ and $x$ both as vectors,
 and here $d$ is the number of input variables (not counting $x_0$).
 
@@ -586,7 +584,7 @@ even if $\sigma^2$ were unknown. We will use this fact again later, when we talk
 about the exponential family and generalized linear models.
 
 
-\section{Locally weighted linear regression}
+\section{($\dagger$) Locally weighted linear regression}
 Consider the problem of predicting $y$ from $x \in \bb R$. The leftmost figure below
 shows the result of fitting a $y = \theta_0 + \theta_1 x$ to a dataset. We see that the data
 doesn't really lie on straight line, and so the fit is not very good.
@@ -612,7 +610,7 @@ doesn't really lie on straight line, and so the fit is not very good.
     \end{center}
 \end{figure*}
 
-Instead, if we had added an extra feature $x^2$, and fit $y = \theta_0 + \theta_1 x + \theta_2 x^2$ ,
+Instead, if we had added an extra feature $x^2$, and fit $y = \theta_0 + \theta_1 x + \theta_2 x^2$,
 then we obtain a slightly better fit to the data. (See middle figure) Naively, it
 might seem that the more features we add, the better. However, there is also
 a danger in adding too many features: The rightmost figure is the result of
@@ -693,11 +691,11 @@ hypothesis $h$ grows linearly with the size of the training set.
 Let's now talk about the classification problem. This is just like the regression
 problem, except that the values $y$ we now want to predict take on only
 a small number of discrete values. For now, we will focus on the \textbf{binary
-classification} problem in which $y$ can take on only two values, 0 and 1.
+classification} problem in which $y$ can take on only two values, $0$ and $1$.
 (Most of what we say here will also generalize to the multiple-class case.)
 For instance, if we are trying to build a spam classifier for email, then $x^{(i)}$
-may be some features of a piece of email, and $y$ may be 1 if it is a piece
-of spam mail, and 0 otherwise. The class 0 is also called the \textbf{negative class}, and 1 % DIFF: added "The class" to the sentence (don't start with numbers...)
+may be some features of a piece of email, and $y$ may be $1$ if it is a piece
+of spam mail, and $0$ otherwise. The class $0$ is also called the \textbf{negative class}, and $1$ % DIFF: added "The class" to the sentence (don't start with numbers...)
 the \textbf{positive class}, and they are sometimes also denoted by the symbols ``$-$''
 and ``$+$''. Given $x^{(i)}$, the corresponding $y^{(i)}$ is also called the \textbf{label} for the
 training example.
@@ -741,9 +739,9 @@ showing $g(z)$:
     \end{center}
 \end{figure}
 
-Notice that $g(z)$ tends towards 1 as $z \to \infty$, and $g(z)$ tends towards 0 as
+Notice that $g(z)$ tends towards $1$ as $z \to \infty$, and $g(z)$ tends towards $0$ as
 $z \to -\infty$. Moreover, $g(z)$, and hence also $h(x)$, is always bounded between
-0 and 1. As before, we are keeping the convention of letting $x_0 = 1$, so that $\theta^top x = \theta_0 + \sum_{j=1}^{d} \theta_j x_j$.
+$0$ and $1$. As before, we are keeping the convention of letting $x_0 = 1$, so that $\theta^\top x = \theta_0 + \sum_{j=1}^{d} \theta_j x_j$.
 
 For now, let's take the choice of $g$ as given. Other functions that smoothly
 increase from 0 to 1 can also be used, but for a couple of reasons that we'll see
@@ -759,7 +757,7 @@ which we write as $g'$:
 \end{align}
 
 So, given the logistic regression model, how do we fit $\theta$ for it? Following
-how we saw least squares regression could be derived as the maximum like-lihood
+how we saw least squares regression could be derived as the maximum likelihood
 estimator under a set of assumptions, let's endow our classification
 model with a set of probabilistic assumptions, and then fit the parameters
 via maximum likelihood.
@@ -813,7 +811,7 @@ Is this coincidence, or is there a deeper reason behind this? We'll answer this
 when we get to GLM models.
 
 
-\section{Digression: The perceptron learning algorithm} % TYPO: algorithn
+\section{($\dagger^+$) Digression: The perceptron learning algorithm} % TYPO: algorithn
 We now digress to talk briefly about an algorithm that's of some historical
 interest, and that we will also return to later when we talk about learning
 theory. Consider modifying the logistic regression method to ``force'' it to

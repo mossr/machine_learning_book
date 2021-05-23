@@ -342,7 +342,7 @@ hidden units and $d$ dimensional input $x \in \mathbb{R}^d$ is defined as
 Note that by default the vectors in $\mathbb R^d$ are viewed as column vectors, and
 in particular $a$ is a column vector with components $a_1 ,a_2 ,\ldots,a_m$. The indices
 ${}^{[1]}$ and ${}^{[2]}$ are used to distinguish two sets of parameters: the $w^{[1]}_j$'s (each of
-which is a vector in $\mathbb R^d$ ) and $w^{[2]}$ (which is a vector in $\mathbb R^m$ ). We will have
+which is a vector in $\mathbb R^d$) and $w^{[2]}$ (which is a vector in $\mathbb R^m$). We will have
 more of these later.
 
 \paragraph{Vectorization} Before we introduce neural networks with more layers and
@@ -415,7 +415,7 @@ from \texttt{numpy} where a vector is viewed as a row vector in broadcasting.)
 Computing the activations $a \in \mathbb{R}^m$ from $z \in \mathbb{R}^m$ involves an element-wise
 non-linear application of the ReLU function, which can be computed in
 parallel efficiently. Overloading ReLU for element-wise application of ReLU
-(meaning, for a vector $t \in \mathbb{R}^d$ , $\ReLU(t)$ is a vector such that $\ReLU(t)_i =
+(meaning, for a vector $t \in \mathbb{R}^d$, $\ReLU(t)$ is a vector such that $\ReLU(t)_i =
 \ReLU(t_i))$, we have:
 \begin{equation}
     a = \ReLU(z)
@@ -448,7 +448,7 @@ Then a multi-layer neural network can be written as:
 \end{align}
 
 We note that the weight matrices and biases need to have compatible
-dimensions for the equations above to make sense. If $a^{[k]}$ has dimension $m_k$ ,
+dimensions for the equations above to make sense. If $a^{[k]}$ has dimension $m_k$,
 then the weight matrix $W^{[k]}$ should be of dimension $m_k \times m_{k-1}$, and the bias
 $b^{[k]} \in \mathbb{R}^{m_k}$. Moreover, $W^{[1]} \in \mathbb{R}^{m_1 \times d}$ and $W^{[r]} \in \mathbb{R}^{1 \times m_{r-1}}$.
 
@@ -610,9 +610,9 @@ Recall the following equations are used for the computation of the loss $J$:
     h_\theta(x) \triangleq o &= W^{[2]}a + b^{[2]}\\
     J = \frac{1}{2} (y - o)^2
 \end{align}
-Recall that $W^{[1]} \in \mathbb{R}^{m \times d}$, $W^{[2]} \in \mathbb{R}^{1 \times m}$, and $b^{[1]},z,a \in \mathbb{R}^m$ , and $o,y,b^{[2]} \in \mathbb{R}$.
+Recall that $W^{[1]} \in \mathbb{R}^{m \times d}$, $W^{[2]} \in \mathbb{R}^{1 \times m}$, and $b^{[1]},z,a \in \mathbb{R}^m$, and $o,y,b^{[2]} \in \mathbb{R}$.
 Recall that a vector in $\mathbb R^d$ is automatically interpreted as a column vector
-(like a matrix in $\mathbb R^{d \times 1}$ ) if need be.\footnote{
+(like a matrix in $\mathbb R^{d \times 1}$) if need be.\footnote{
 We also note that even though this is the convention in math, it's different from the
 convention in numpy where an one dimensional array will be automatically interpreted as
 a row vector.}

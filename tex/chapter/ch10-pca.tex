@@ -1,0 +1,169 @@
+\titlespacing*{\part}{0pt}{-20pt}{30pt} % to fix table and plot together on the first page (SEE RESTORE AT BOTTOM)
+\titlespacing*{\chapter}{0pt}{-10pt}{30pt}
+
+\part{Principal Components Analysis}
+\label{part:pca}
+
+\marginnote{From CS229 Spring 2021, Andrew Ng, Moses Charikar \& Christopher R\'e, Stanford University.}
+
+In our discussion of factor analysis, we gave a way to model data $x \in \mathbb R^d$ as
+``approximately'' lying in some $k$-dimension subspace, where $k \ll d$. Specifically, we imagined that each point $x^{(i)}$ was created by first generating some $z^{(i)}$
+lying in the $k$-dimension affine space ${\Lambda z + \mu; z \in \mathbb R^k}$, and then adding
+$\Psi$-covariance noise. Factor analysis is based on a probabilistic model, and
+parameter estimation used the iterative EM algorithm.
+
+In this set of notes, we will develop a method, \textbf{Principal Components
+Analysis} (PCA), that also tries to identify the subspace in which the data
+approximately lies. However, PCA will do so more directly, and will require
+only an eigenvector calculation (easily done with the \texttt{eig} function in Matlab),
+and does not need to resort to EM.
+
+Suppose we are given a dataset ${x^{(i)}; i = 1, \ldots, n}$ of attributes of $n$ different types of automobiles, such as their maximum speed, turn radius, and
+so on. Let $x^{(i)} \in \mathbb R^d$ for each $i$ ($d \ll n$). But unknown to us, two different
+attributes---some $x_i$ and $x_j$---respectively give a car's maximum speed measured in miles per hour, and the maximum speed measured in kilometers per
+hour. These two attributes are therefore almost linearly dependent, up to
+only small differences introduced by rounding off to the nearest mph or kph.
+Thus, the data really lies approximately on an $n - 1$ dimensional subspace.
+How can we automatically detect, and perhaps remove, this redundancy?
+
+For a less contrived example, consider a dataset resulting from a survey of
+pilots for radio-controlled helicopters, where $x^{(i)}_1$
+is a measure of the piloting
+skill of pilot $i$, and $x^{(i)}_2$
+captures how much he/she enjoys flying. Because
+RC helicopters are very difficult to fly, only the most committed students,
+ones that truly enjoy flying, become good pilots. So, the two attributes
+$x_1$ and $x_2$ are strongly correlated. Indeed, we might posit that that the
+data actually lies along some diagonal axis (the $u_1$ direction) capturing the % TYPO: "likes"
+intrinsic piloting ``karma'' of a person, with only a small amount of noise
+lying off this axis. (See figure.) How can we automatically compute this $u_1$
+direction?
+% TODO: Figure.
+
+We will shortly develop the PCA algorithm. But prior to running PCA
+per se, typically we first preprocess the data by normalizing each feature
+to have mean $0$ and variance $1$. We do this by subtracting the mean and
+dividing by the empirical standard deviation:
+\[
+    x^{(i)}_j \leftarrow \frac{x^{(i)}_j - \mu_j}{\sigma_j}
+\]
+where $\mu_j = \frac{1}{n} \sum^n_{i=1} x^{(i)}_j$
+and $\sigma^2_j = \frac{1}{n} \sum_{i=1}^n (x^{(i)}_j - \mu_j)^2$ are the mean variance of
+feature $j$, respectively.
+
+Subtracting $\mu_j$ zeros out the mean and may be omitted for data known
+to have zero mean (for instance, time series corresponding to speech or other
+acoustic signals). Dividing by the standard deviation $\sigma_j$ rescales each coordinate to have unit variance, which ensures that different attributes are all
+treated on the same ``scale.'' For instance, if $x_1$ was cars' maximum speed in
+mph (taking values in the high tens or low hundreds) and $x_2$ were the number of seats (taking values around 2-4), then this renormalization rescales
+the different attributes to make them more comparable. This rescaling may
+be omitted if we had a priori knowledge that the different attributes are all
+on the same scale. One example of this is if each data point represented a
+grayscale image, and each $x^{(i)}_j$
+took a value in $\{0, 1, \ldots, 255\}$ corresponding
+to the intensity value of pixel $j$ in image $i$.
+
+Now, having normalized our data, how do we compute the ``major axis
+of variation'' $u$---that is, the direction on which the data approximately lies?
+One way is to pose this problem as finding the unit vector $u$ so that when
+the data is projected onto the direction corresponding to $u$, the variance of
+the projected data is maximized. Intuitively, the data starts off with some
+amount of variance/information in it. We would like to choose a direction $u$
+so that if we were to approximate the data as lying in the direction/subspace
+corresponding to $u$, as much as possible of this variance is still retained.
+Consider the following dataset, on which we have already carried out the
+normalization steps:
+
+% TODO: Figure.
+
+Now, suppose we pick $u$ to correspond the the direction shown in the
+figure below. The circles denote the projections of the original data onto this
+line.
+
+% TODO: Figure, projection.
+
+We see that the projected data still has a fairly large variance, and the
+points tend to be far from zero. In contrast, suppose had instead picked the
+following direction:
+
+% TODO: Figure.
+
+Here, the projections have a significantly smaller variance, and are much
+closer to the origin.
+
+We would like to automatically select the direction u corresponding to
+the first of the two figures shown above. To formalize this, note that given a
+unit vector $u$ and a point $x$, the length of the projection of $x$ onto $u$ is given
+by $x^\top u$. I.e., if $x^{(i)}$
+is a point in our dataset (one of the crosses in the plot),
+then its projection onto $u$ (the corresponding circle in the figure) is distance
+$x^\top u$ from the origin. Hence, to maximize the variance of the projections, we
+would like to choose a unit-length $u$ so as to maximize:
+\begin{align*}
+    \frac{1}{n} \sum_{i=1}^n (x^{(i)^\top} u)^2 &= \frac{1}{n} \sum_{i=1}^n u^\top x^{(i)} x^{(i)^\top} u\\
+        &= u^\top \left( \frac{1}{n} \sum_{i=1}^n x^{(i)} x^{(i)^\top} \right) u
+\end{align*}
+We easily recognize that the maximizing this subject to $\lVert u \rVert^2 = 1$ gives the
+principal eigenvector of $\Sigma = \frac{1}{n}\sum^n_{i=1} x^{(i)}x^{(i)^\top}$, which is just the empirical
+covariance matrix of the data (assuming it has zero mean).\footnote{
+If you haven't seen this before, try using the method of Lagrange multipliers to maximize $u^\top \Sigma u$ subject to that $u^\top u = 1$.
+You should be able to show that $\Sigma u = \lambda u$, for some
+$\lambda$, which implies $u$ is an eigenvector of $\Sigma$, with eigenvalue $\lambda$.}
+
+To summarize, we have found that if we wish to find a 1-dimensional
+subspace with with to approximate the data, we should choose $u$ to be the
+principal eigenvector of $\Sigma$. More generally, if we wish to project our data
+into a $k$-dimensional subspace ($k < d$), we should choose $u_1, \ldots, u_k$ to be the
+top $k$ eigenvectors of $\Sigma$. The $u_i$'s now form a new, orthogonal basis for the
+data.\footnote{Because $\Sigma$ is symmetric, the $u_i$'s will (or always can be chosen to be) orthogonal toeach other.}
+
+Then, to represent $x^{(i)}$ in this basis, we need only compute the corresponding vector
+\[
+y^{(i)} = \begin{bmatrix}
+    u_1^\top x^{(i)}\\
+    u_2^\top x^{(i)}\\
+    \vdots\\
+    u_k^\top x^{(i)}\\
+\end{bmatrix} \in \mathbb R^k.
+\]
+Thus, whereas $x^{(i)} \in \mathbb R^d$, the vector $y^{(i)}$ now gives a lower, $k$-dimensional,
+approximation/representation for $x^{(i)}$. PCA is therefore also referred to as
+a \textbf{dimensionality reduction} algorithm. The vectors $u_1, \ldots, u_k$ are called
+the first $k$ \textbf{principal components} of the data.
+
+\paragraph{Remark} Although we have shown it formally only for the case of $k = 1$,
+using well-known properties of eigenvectors it is straightforward to show that
+of all possible orthogonal bases $u_1, \ldots, u_k$, the one that we have chosen maximizes $\sum_i \lVert y^{(i)} \rVert_2^2$. Thus, our choice of a basis preserves as much variability
+as possible in the original data.
+
+In problem set 4, you will see that PCA can also be derived by picking
+the basis that minimizes the approximation error arising from projecting the
+data onto the $k$-dimensional subspace spanned by them.
+
+PCA has many applications; we will close our discussion with a few examples. First, compression---representing $x^{(i)}$'s with lower dimension $y^{(i)}$'s---is an
+obvious application. If we reduce high dimensional data to $k = 2$ or $3$ dimensions, then we can also plot the $y^{(i)}$'s to visualize the data. For instance,
+if we were to reduce our automobiles data to $2$ dimensions, then we can plot
+it (one point in our plot would correspond to one car type, say) to see what
+cars are similar to each other and what groups of cars may cluster together.
+
+Another standard application is to preprocess a dataset to reduce its
+dimension before running a supervised learning learning algorithm with the
+$x^{(i)}$'s as inputs. Apart from computational benefits, reducing the data's
+dimension can also reduce the complexity of the hypothesis class considered
+and help avoid overfitting (e.g., linear classifiers over lower dimensional input
+spaces will have smaller VC dimension).
+
+Lastly, as in our RC pilot example, we can also view PCA as a noise
+reduction algorithm. In our example it, estimates the intrinsic ``piloting
+karma'' from the noisy measures of piloting skill and enjoyment. In class, we
+also saw the application of this idea to face images, resulting in \textbf{eigenfaces}
+method. Here, each point $x^{(i)} \in \mathbb R^{100 \times 100}$ was a $10000$ dimensional vector,
+with each coordinate corresponding to a pixel intensity value in a $100\times100$
+image of a face. Using PCA, we represent each image $x^{(i)}$ with a much lowerdimensional $y^{(i)}$.
+In doing so, we hope that the principal components we
+found retain the interesting, systematic variations between faces that capture
+what a person really looks like, but not the ``noise'' in the images introduced
+by minor lighting variations, slightly different imaging conditions, and so on.
+We then measure distances between faces $i$ and $j$ by working in the reduced
+dimension, and computing $\lVert y^{(i)} - y^{(j)} \rVert_2$. This resulted in a surprisingly good
+face-matching and retrieval algorithm.

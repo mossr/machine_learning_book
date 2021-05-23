@@ -1,0 +1,360 @@
+\titlespacing*{\part}{0pt}{-20pt}{30pt} % to fix table and plot together on the first page (SEE RESTORE AT BOTTOM)
+\titlespacing*{\chapter}{0pt}{-10pt}{30pt}
+
+\part{Factor Analysis}
+\label{part:factor_analysis}
+
+\marginnote{From CS229 Spring 2021, Andrew Ng, Moses Charikar \& Christopher R\'e, Stanford University.}
+
+When we have data $x^{(i)} \in \mathbb R^d$
+that comes from a mixture of several Gaussians,
+the EM algorithm can be applied to fit a mixture model. In this setting, we
+usually imagine problems where we have sufficient data to be able to discern
+the multiple-Gaussian structure in the data. For instance, this would be the
+case if our training set size $n$ was significantly larger than the dimension $d$
+of the data.
+
+Now, consider a setting in which $d \gg n$. In such a problem, it might be
+difficult to model the data even with a single Gaussian, much less a mixture
+of Gaussian. Specifically, since the $n$ data points span only a low-dimensional
+subspace of $\mathbb R^d$, if we model the data as Gaussian, and estimate the mean
+and covariance using the usual maximum likelihood estimators,
+\begin{align*}
+    \mu &= \frac 1 n \sum^n_{i=1} x^{(i)}\\
+    \Sigma &= \frac 1 n \sum^n_{i=1} (x^{(i)} - \mu)(x^{(i)} - \mu)^\top,
+\end{align*}
+we would find that the matrix $\Sigma$ is singular. This means that $\Sigma^{-1}$ does not
+exist, and $1/|\Sigma|^{1/2} = 1/0$. But both of these terms are needed in computing
+the usual density of a multivariate Gaussian distribution. Another way of
+stating this difficulty is that maximum likelihood estimates of the parameters
+result in a Gaussian that places all of its probability in the affine space
+spanned by the data,\footnote{This is the set of points $x$ satisfying $x = \sum^n_{i=1} \alpha_i x^{(i)}$, for some $\alpha_i$'s so that $\sum^n_{i=1} \alpha_i = 1$.} % TYPO: \alpha_1 should be \alpha_i in summation.
+and this corresponds to a singular covariance matrix.
+
+More generally, unless $n$ exceeds $d$ by some reasonable amount, the maximum likelihood estimates of the mean and covariance may be quite poor.
+Nonetheless, we would still like to be able to fit a reasonable Gaussian model
+to the data, and perhaps capture some interesting covariance structure in
+the data. How can we do this?
+
+In the next section, we begin by reviewing two possible restrictions on
+$\Sigma$ that allow us to fit $\Sigma$ with small amounts of data but neither will give
+a satisfactory solution to our problem. We next discuss some properties of
+Gaussians that will be needed later; specifically, how to find marginal and
+conditonal distributions of Gaussians. Finally, we present the factor analysis
+model, and EM for it.
+
+\section{Restrictions of $\Sigma$}
+If we do not have sufficient data to fit a full covariance matrix, we may
+place some restrictions on the space of matrices $\Sigma$ that we will consider. For
+instance, we may choose to fit a covariance matrix $\Sigma$ that is diagonal. In this
+setting, the reader may easily verify that the maximum likelihood estimate
+of the covariance matrix is given by the diagonal matrix $\Sigma$ satisfying
+\[
+\Sigma_{jj} =
+\frac 1 n \sum^n_{i=1} (x^{(i)}_j - \mu_j)^2.
+\]
+Thus, $\Sigma_{jj}$ is just the empirical estimate of the variance of the $j$-th coordinate
+of the data.
+
+Recall that the contours of a Gaussian density are ellipses. A diagonal
+$\Sigma$ corresponds to a Gaussian where the major axes of these ellipses are axis-aligned.
+
+Sometimes, we may place a further restriction on the covariance matrix
+that not only must it be diagonal, but its diagonal entries must all be equal.
+In this setting, we have $\Sigma = \sigma^2 I$, where $\sigma^2$
+is the parameter under our control.
+The maximum likelihood estimate of $\sigma^2$ can be found to be:
+\[
+    \sigma^2 = \frac{1}{nd} \sum^d_{j=1}\sum^n_{i=1}(x^{(i)}_j - \mu_j)^2.
+\]
+This model corresponds to using Gaussians whose densities have contours
+that are circles (in $2$ dimensions; or spheres/hyperspheres in higher dimensions).
+
+If we are fitting a full, unconstrained, covariance matrix $\Sigma$ to data, it is
+necessary that $n \ge d + 1$ in order for the maximum likelihood estimate of $\Sigma$
+not to be singular. Under either of the two restrictions above, we may obtain
+non-singular $\Sigma$ when $n \ge 2$.
+
+However, restricting $\Sigma$ to be diagonal also means modeling the different
+coordinates $x_i, x_j$ of the data as being uncorrelated and independent. Often,
+it would be nice to be able to capture some interesting correlation structure
+in the data. If we were to use either of the restrictions on $\Sigma$ described above,
+we would therefore fail to do so. In this set of notes, we will describe the
+factor analysis model, which uses more parameters than the diagonal $\Sigma$ and
+captures some correlations in the data, but also without having to fit a full
+covariance matrix.
+
+\section{Marginals and conditionals of Gaussians}
+Before describing factor analysis, we digress to talk about how to find conditional and marginal distributions of random variables with a joint multivariate Gaussian distribution.
+
+Suppose we have a vector-valued random variable
+\[
+x =
+\begin{bmatrix}
+    x_1\\
+    x_2
+\end{bmatrix},
+\]
+where $x_1 \in \mathbb R^r$, $x_2 \in \mathbb R^s$, and $x \in \mathbb R^{r+s}$.
+Suppose $x \sim \mathcal N(\mu , \Sigma)$, where
+\[
+    \mu = \begin{bmatrix}
+        \mu_1\\
+        \mu_2        
+    \end{bmatrix}
+    ,
+    \quad
+    \Sigma = \begin{bmatrix}
+        \Sigma_{11} & \Sigma_{12}\\
+        \Sigma_{21} & \Sigma_{22}        
+    \end{bmatrix}.
+\]
+Here, $\mu_1 \in \mathbb R^r$, $\mu_2 \in \mathbb R^s$, $\Sigma_{11} \in \mathbb R^{r \times r}$,
+$\Sigma_{12} \in \mathbb R^{r \times s}$, and so on. Note that since
+covariance matrices are symmetric, $\Sigma_{12} = \Sigma^\top_{21}$.
+
+Under our assumptions, $x_1$ and $x_2$ are jointly multivariate Gaussian.
+What is the marginal distribution of $x_1$? It is not hard to see that $\mathbb E[x_1] = \mu_1$,
+and that $\operatorname{Cov}(x_1) = \mathbb E[(x_1 - \mu_1)(x_1 - \mu_1)] = \Sigma_{11}$. To see that the latter is
+true, note that by definition of the joint covariance of $x_1$ and $x_2$, we have
+that:
+\begin{align*}
+    \operatorname{Cov}(x) &= \Sigma\\
+        &= \begin{bmatrix}
+            \Sigma_{11} & \Sigma_{12}\\
+            \Sigma_{21} & \Sigma_{22}
+        \end{bmatrix}\\
+        &= \mathbb E[(x - \mu )(x - \mu)^\top]\\
+        &= \mathbb E \begin{bmatrix} 
+            \binom{x_1 - \mu_1}{x_2 - \mu_2} & \binom{x_1 - \mu_1}{x_2 - \mu_2}^\top
+        \end{bmatrix}\\
+    &= \mathbb E
+    \begin{bmatrix}
+        (x_1 - \mu_1)(x_1 - \mu_1)^\top & (x_1 - \mu_1)(x_2 - \mu_2)^\top\\
+        (x_2 - \mu_2)(x_1 - \mu_1)^\top & (x_2 - \mu_2)(x_2 - \mu_2)^\top
+    \end{bmatrix}.
+\end{align*}
+Matching the upper-left subblocks in the matrices in the second and the last
+lines above gives the result.
+
+Since marginal distributions of Gaussians are themselves Gaussian, we
+therefore have that the marginal distribution of $x_1$ is given by $x_1 \sim \mathcal N (\mu_1, \Sigma_{11})$.
+Also, we can ask, what is the conditional distribution of $x_1$ given $x_2$? By
+referring to the definition of the multivariate Gaussian distribution, it can
+be shown that $x_1 \mid x_2 \sim \mathcal N (\mu_{1 \mid 2}, \Sigma_{1 \mid 2})$, where:
+\begin{align}
+    \mu_{1 \mid 2} &= \mu_1 + \Sigma_{12}\Sigma^{-1}_22 (x_2 - \mu_2)\label{eq:conditional_mu}\\
+    \Sigma_{1 \mid 2} &= \Sigma_{11} - \Sigma_{12}\Sigma^{-1}_22 \Sigma_{21}\label{eq:conditional_Sigma}
+\end{align}
+
+When we work with the factor analysis model in the next section, these
+formulas for finding conditional and marginal distributions of Gaussians will
+be very useful.
+
+\section{The factor analysis model}
+In the factor analysis model, we posit a joint distribution on $(x, z)$ as follows,
+where $z \in \mathbb R^k$ is a latent random variable:
+\begin{align*}
+    z &\sim \mathcal N (0, I)\\
+    x \mid z &\sim \mathcal N (\mu + \Lambda z, \Psi)
+\end{align*}
+
+Here, the parameters of our model are the vector $\mu \in \mathbb R^d$, the matrix
+$\Lambda \in \mathbb R^{d \times k}$, and the diagonal matrix $\Psi \in \mathbb R^{d \times d}$.
+The value of $k$ is usually chosen to be smaller than $d$.
+
+Thus, we imagine that each datapoint $x^{(i)}$
+is generated by sampling a $k$ dimension multivariate Gaussian $z^{(i)}$. Then, it is mapped to a $d$-dimensional
+affine space of $\mathbb R^d$ by computing $\mu + \Lambda z^{(i)}$. Lastly, $x^{(i)}$
+is generated by adding covariance $\Psi$ noise to $\mu + \Lambda z^{(i)}$.
+
+Equivalently (convince yourself that this is the case), we can therefore
+also define the factor analysis model according to
+\begin{align*}
+    z &\sim \mathcal N(0, I)\\
+    \epsilon &\sim \mathcal N (0, \Psi)\\
+    x &= \mu + \Lambda z + \epsilon
+\end{align*}
+where $\epsilon$ and $z$ are independent.
+
+Let's work out exactly what distribution our model defines. Our random
+variables $z$ and $x$ have a joint Gaussian distribution
+\[
+\begin{bmatrix}
+    z\\
+    x
+\end{bmatrix} \sim \mathcal N (\mu_{zx}, \Sigma).
+\]
+We will now find $\mu_{zx}$ and $\Sigma$.
+
+We know that $\mathbb E[z] = 0$, from the fact that $z \sim \mathcal N (0, I)$. Also, we have
+that:
+\begin{align*}
+    \mathbb E[x] &= \mathbb E[\mu + \Lambda z + \epsilon]
+        &= \mu + \Lambda \mathbb E[z] + \mathbb E[\epsilon]
+        &= \mu
+\end{align*}
+Putting these together, we obtain
+\[
+\mu_{zx} =
+\begin{bmatrix}
+    \vec{0}\\
+    \mu    
+\end{bmatrix}
+\]
+Next, to find $\Sigma$, we need to calculate:
+\begin{align*} % DIFF: align.
+    \Sigma_{zz} &= \mathbb E[(z - \mathbb E[z])(z - \mathbb E[z])^\top] \tag{the upper-left block of $\Sigma$}\\
+    \Sigma_{zx} &= \mathbb E[(z - \mathbb E[z])(x - \mathbb E[x])^\top] \tag{upper-right block}\\
+    \Sigma_{xx} &= \mathbb E[(x - \mathbb E[x])(x - \mathbb E[x])^\top] \tag{lower-right block}
+\end{align*}
+
+Now, since $z \sim \mathcal N (0, I)$, we easily find that $\Sigma_{zz} = \operatorname{Cov}(z) = I$. Also,
+\begin{align*}
+    \mathbb E[(z - \mathbb E[z])(x - \mathbb E[x])^\top] &= \mathbb E[z(\mu + \Lambda z + \epsilon - \mu)^\top]\\
+        &= \mathbb E[zz^\top]\Lambda^\top + \mathbb E[z\epsilon^\top]\\
+        &= \Lambda^\top
+\end{align*}
+In the last step, we used the fact that $\mathbb E[zz^\top] = \operatorname{Cov}(z)$ (since $z$ has zero
+mean), and $\mathbb E[z\epsilon^\top] = \mathbb E[z]\mathbb E[\epsilon^\top] = 0$ (since $z$ and $\epsilon$ are independent, and
+hence the expectation of their product is the product of their expectations).
+Similarly, we can find $\Sigma_{xx}$ as follows:
+\begin{align*}
+    \mathbb E[(x - \mathbb E[x])(x - \mathbb E[x])^\top] &= \mathbb E[(\mu + \Lambda z + \epsilon - \mu )(\mu + \Lambda z + \epsilon - \mu)^\top]\\
+        &= \mathbb E[\Lambda zz^\top\Lambda^\top + \epsilon z^\top\Lambda^\top + \Lambda z\epsilon^\top + \epsilon \epsilon^\top]\\
+        &= \Lambda \mathbb E[zz^\top]\Lambda^\top + \mathbb E[\epsilon \epsilon^\top]\\
+        &= \Lambda \Lambda^\top + \Psi
+\end{align*}
+Putting everything together, we therefore have that
+\begin{equation}\label{eq:joint_gaussian}
+    \begin{bmatrix}
+        z\\
+        x
+    \end{bmatrix} \sim \mathcal N\left(\begin{bmatrix}
+        \vec{0}\\
+        \mu
+    \end{bmatrix}, \begin{bmatrix}
+        I & \Lambda^\top\\
+        \Lambda & \Lambda\Lambda^\top + \Psi
+    \end{bmatrix} \right).
+\end{equation}
+
+Hence, we also see that the marginal distribution of $x$ is given by $x \sim 
+N (\mu ,\Lambda \Lambda^\top + \Psi)$. Thus, given a training set ${x^{(i)}
+; i = 1, \ldots, n}$, we can write
+down the log likelihood of the parameters:
+\begin{equation}
+    \ell(\mu ,\Lambda , \Psi) = \log \prod^n_{i=1} \frac{1}{(2\pi)^{d/2}|\Lambda \Lambda^\top + \Psi|^{1/2}}\exp\left(-\frac{1}{2} (x^{(i)} - \mu)^\top (\Lambda \Lambda^\top + \Psi)^{-1} (x^{(i)} - \mu)\right)
+\end{equation}
+To perform maximum likelihood estimation, we would like to maximize this
+quantity with respect to the parameters. But maximizing this formula explicitly is hard (try it yourself), and we are aware of no algorithm that does
+so in closed-form. So, we will instead use to the EM algorithm. In the next
+section, we derive EM for factor analysis.
+
+
+\section{EM for factor analysis}
+The derivation for the E-step is easy. We need to compute $Q_i(z^{(i)}) = p(z^{(i)} \mid x^{(i)}; \mu ,\Lambda , \Psi)$.
+By substituting the distribution given in \cref{eq:joint_gaussian}
+into the formulas \ref{eq:conditional_mu}-\ref{eq:conditional_Sigma} used for finding the conditional distribution of a
+Gaussian, we find that $z^{(i)} \mid x^{(i)}; \mu ,\Lambda , \Psi \sim \mathcal N (\mu_{z^{(i)} \mid x^{(i)}}, \Sigma_{z^{(i)}\mid x^{(i)}})$, where
+\begin{align*}
+    \mu_{z^{(i)} \mid x^{(i)}} &= \Lambda^\top (\Lambda \Lambda^\top + \Psi)^{-1} (x^{(i)} - \mu)\\
+    \Sigma_{z^{(i)} \mid x^{(i)}} &= I - \Lambda^\top (\Lambda \Lambda^\top + \Psi)^{-1}\Lambda
+\end{align*}
+So, using these definitions for $\mu_{z^{(i)} \mid x^{(i)}}$ and $\Sigma_{z^{(i)} \mid x^{(i)}}$, we have:
+\[
+    Q_i(z^{(i)}) = \frac{1}{(2\pi)^{k/2}|\Sigma_{z^{(i)} \mid x^{(i)}}|^{1/2}}\exp\left(-\frac{1}{2} (z^{(i)} - \mu_{z^{(i)} \mid x^{(i)}})^\top\Sigma^{-1}_{z^{(i)} \mid x^{(i)}} (z^{(i)} - \mu_{z^{(i)} \mid x^{(i)}})\right)
+\]
+
+Let's now work out the M-step. Here, we need to maximize
+\begin{equation}\label{eq:m_step_fa_max}
+    \sum^n_{i=1}\int_{z^{(i)}} Q_i(z^{(i)})\log \frac{p(x^{(i)}, z^{(i)}; \mu ,\Lambda , \Psi)}{Q_i(z^{(i)})}dz^{(i)}
+\end{equation}
+with respect to the parameters $\mu ,\Lambda , \Psi$. We will work out only the optimization with respect to $\Lambda$, and leave the derivations of the updates for $\mu$ and $\Psi$
+as an exercise to the reader.
+
+We can simplify \cref{eq:m_step_fa_max} as follows:
+\begin{align}
+    \sum_{i=1}^n &\int_{z^{(i)}} Q_i(z^{(i)}) [\log p(x^{(i)} \mid z^{(i)}; \mu ,\Lambda , \Psi) + \log p(z^{(i)}) - \log Q_i(z^{(i)})] dz^{(i)}\\
+    &= \sum_{i=1}^n \mathbb E_{z^{(i)} \sim Q_i} [\log p(x^{(i)} \mid z^{(i)}; \mu ,\Lambda , \Psi) + \log p(z^{(i)}) - \log Q_i(z^{(i)})]
+\end{align}
+Here, the ``$z^{(i)} \sim Q_i$'' subscript indicates that the expectation is with respect
+to $z^{(i)}$ drawn from $Q_i$. In the subsequent development, we will omit this
+subscript when there is no risk of ambiguity. Dropping terms that do not
+depend on the parameters, we find that we need to maximize:
+\begin{align*}
+    \sum_{i=1}^n &\mathbb E[\log p(x^{(i)} \mid z^{(i)}; \mu ,\Lambda , \Psi)]\\
+        &= \sum^n_{i=1} \mathbb E\left[\log \frac{1}{(2\pi)^{d/2}|\Psi|^{1/2}}\exp\left(-\frac{1}{2} (x^{(i)} - \mu - \Lambda z^{(i)})^\top\Psi^{-1}(x^{(i)} - \mu - \Lambda z^{(i)})\right)\right]\\
+        &= \sum^n_{i=1} \mathbb E\left[-\frac{1}{2}\log |\Psi| - \frac{n}{2}\log(2\pi) -\frac{1}{2} (x^{(i)} - \mu - \Lambda z^{(i)})^\top\Psi^{-1}(x^{(i)} - \mu - \Lambda z^{(i)})\right]
+\end{align*}
+Let's maximize this with respect to $\Lambda$. Only the last term above depends
+on $\Lambda$. Taking derivatives, and using the facts that $\operatorname{tr}(a)=a$ (for $a \in \mathbb R$),
+$\operatorname{tr}(AB) = \operatorname{tr}(BA)$, and $\nabla_A\operatorname{tr}(ABA^\top C) = CAB + C^\top AB^\top$, we get:
+\begin{align*}
+    \nabla_\Lambda &\sum^n_{i=1} -\mathbb E\left[\frac{1}{2}(x^{(i)} - \mu - \Lambda z^{(i)})^\top\Psi^{-1}(x^{(i)} - \mu - \Lambda z^{(i)})\right]\\
+        &= \sum^n_{i=1} \nabla_\Lambda \mathbb E\left[-\operatorname{tr}(\frac{1}{2} z^{(i)^\top}\Lambda^\top\Psi^{-1}\Lambda z^{(i)}) + \operatorname{tr}(z^{(i)^\top}\Lambda^\top\Psi^{-1}(x^{(i)} - \mu))\right]\\
+        &= \sum^n_{i=1} \nabla_\Lambda \mathbb E\left[-\operatorname{tr}(\frac{1}{2} \Lambda^\top \Psi^{-1} \Lambda z^{(i)} z^{(i)^\top}) + \operatorname{tr}(\Lambda^\top\Psi^{-1}(x^{(i)} - \mu)z^{(i)^\top})\right]\\
+        &= \sum^n_{i=1} \mathbb E\left[-\Psi^{-1} \Lambda z^{(i)} z^{(i)^\top} + \Psi^{-1}(x^{(i)} - \mu)z^{(i)^\top}\right]
+\end{align*}
+Setting this to zero and simplifying, we get:
+\[
+    \sum^n_{i=1} \Lambda \mathbb E_{z^{(i)} \sim Q_i} \left[z^{(i)}z^{(i)^\top}\right] = \sum^n_{i=1} (x^{(i)} - \mu) \mathbb E_{z^{(i)}\sim Q_i}\left[z^{(i)^\top}\right]
+\]
+Hence, solving for $\Lambda$, we obtain
+\begin{equation}\label{eq:Lambda}
+    \Lambda = \left(\sum^n_{i=1} (x^{(i)} - \mu)\mathbb E_{z^{(i)}\sim Q_i}\left[z^{(i)^\top}\right]\right) \left(\sum^n_{i=1} \mathbb E_{z^{(i)}\sim Q_i}\left[z^{(i)}z^{(i)^\top}\right]\right)^{-1}
+\end{equation}
+It is interesting to note the close relationship between this equation and the
+normal equation that we'd derived for least squares regression,
+\[
+\text{``}\theta^\top = (y^\top X)(X^\top X)^{-1}\text{.''}
+\]
+The analogy is that here, the $x$'s are a linear function of the $z$'s (plus noise).
+Given the ``guesses'' for $z$ that the E-step has found, we will now try to
+estimate the unknown linearity $\Lambda$ relating the $x$'s and $z$'s. It is therefore
+no surprise that we obtain something similar to the normal equation. There
+is, however, one important difference between this and an algorithm that
+performs least squares using just the ``best guesses'' of the $z$'s; we will see
+this difference shortly.
+
+To complete our M-step update, let's work out the values of the expectations in \cref{eq:Lambda}. From our definition of $Q_i$ being Gaussian with mean
+$\mu_{z^{(i)} \mid x^{(i)}}$ and covariance $\Sigma_{z^{(i)} \mid x^{(i)}}$, we easily find
+\begin{align*}
+    \mathbb E_{z^{(i)}\sim Q_i}\left[z^{(i)^\top}\right] &= \mu^\top_{z^{(i)} \mid x^{(i)}}\\
+    \mathbb E_{z^{(i)}\sim Q_i}\left[z^{(i)}z^{(i)^\top}\right] &= \mu_{z^{(i)} \mid x^{(i)}}\mu^\top_{z^{(i)} \mid x^{(i)}} + \Sigma_{z^{(i)} \mid x^{(i)}}
+\end{align*}
+The latter comes from the fact that, for a random variable $Y$, $\operatorname{Cov}(Y) = \mathbb E[Y Y^\top] - \mathbb E[Y]\mathbb E[Y]^\top$, and hence
+$\mathbb E[Y Y^\top] = \mathbb E[Y]\mathbb E[Y]^\top + \operatorname{Cov}(Y)$. Substituting this back into \cref{eq:Lambda}, we get the M-step update for $\Lambda$:
+\begin{equation}\label{eq:Lambda_m_step}
+    \Lambda = \left(\sum^n_{i=1} (x^{(i)} - \mu )\mu^\top_{z^{(i)} \mid x^{(i)}}\right) \left(\sum^n_{i=1} \mu_{z^{(i)} \mid x^{(i)}}\mu^\top_{z^{(i)} \mid x^{(i)}} + \Sigma_{z^{(i)} \mid x^{(i)}}\right)^{-1}
+\end{equation}
+It is important to note the presence of the $\Sigma_{z^{(i)} \mid x^{(i)}}$ on the right hand side of
+this equation. This is the covariance in the posterior distribution $p(z^{(i)} \mid x^{(i)})$
+of $z^{(i)}$ given $x^{(i)}$, % TYPO: "give" -> "given"
+and the M-step must take into account this uncertainty
+about $z^{(i)}$ in the posterior. A common mistake in deriving EM is to assume
+that in the E-step, we need to calculate only expectation $\mathbb E[z]$ of the latent
+random variable $z$, and then plug that into the optimization in the M-step
+everywhere $z$ occurs. While this worked for simple problems such as the
+mixture of Gaussians, in our derivation for factor analysis, we needed $\mathbb E[zz^\top
+]$ as well as $\mathbb E[z]$; and as we saw, % TYPO: missing "as"
+$\mathbb E[zz^\top]$ and $\mathbb E[z]\mathbb E[z]^\top$ differ by the quantity $\Sigma_{z \mid x}$.
+Thus, the M-step update must take into account the covariance of $z$ in the
+posterior distribution $p(z^{(i)} \mid x^{(i)})$.
+
+Lastly, we can also find the M-step optimizations for the parameters $\mu$ 
+and $\Psi$. It is not hard to show that the first is given by
+\[
+    \mu = \frac{1}{n} \sum_{i=1}^n x^{(i)}.
+\]
+Since this doesn't change as the parameters are varied (i.e., unlike the update
+for $\Lambda$, the right hand side does not depend on $Q_i(z^{(i)}) = p(z^{(i)} \mid x^{(i)}; \mu ,\Lambda , \Psi)$,
+which in turn depends on the parameters), this can be calculated just once
+and needs not be further updated as the algorithm is run. Similarly, the
+diagonal $\Psi$ can be found by calculating
+\[
+\Phi = \frac{1}{n}
+\sum^n_{i=1} x^{(i)}x^{(i)^\top} - x^{(i)}\mu^\top_{z^{(i)} \mid x^{(i)}}\Lambda^\top - \Lambda \mu_{z^{(i)} \mid x^{(i)}} x^{(i)^\top} + \Lambda \left(\mu_{z^{(i)} \mid x^{(i)}}\mu^\top_{z^{(i)} \mid x^{(i)}} + \Sigma_{z^{(i)} \mid x^{(i)}}\right)\Lambda^\top,
+\]    
+and setting $\Psi_{ii} = \Phi_{ii}$ (i.e., letting $\Psi$ be the diagonal matrix containing only
+the diagonal entries of $\Phi$).

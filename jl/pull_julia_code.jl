@@ -116,7 +116,11 @@ for filepath in get_files()
         end
         println(io, "#"^20, "\n")
 
-        i = something(findnext(x-> x ∈ ["\\begin{algorithm}", "\\begin{exalgorithm}"], lines, j), 0) + 1
+        if j != 0
+            i = something(findnext(x-> x ∈ ["\\begin{algorithm}", "\\begin{exalgorithm}"], lines, j), 0) + 1
+        else
+            i = 1
+        end
     end
 end
 close(io)

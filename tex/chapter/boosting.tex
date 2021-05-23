@@ -1,0 +1,353 @@
+\titlespacing*{\chapter}{0pt}{-10pt}{20pt}
+\chapter{Boosting}\label{cha:boosting}
+
+\marginnote{From CS229 Spring 2021, John Duchi, Stanford University.}
+
+\section{Boosting}
+
+We have seen so far how to solve classification (and other) problems when we
+have a data representation already chosen. We now talk about a procedure,
+known as \textit{boosting}, which was originally discovered by Rob Schapire, and
+further developed by Schapire and Yoav Freund, that automatically chooses
+feature representations. We take an optimization-based perspective, which
+is somewhat different from the original interpretation and justification of
+Freund and Schapire, but which lends itself to our approach of (1) choose a
+representation, (2) choose a loss, and (3) minimize the loss.
+
+Before formulating the problem, we give a little intuition for what we
+are going to do. Roughly, the idea of boosting is to take a \textit{weak learning}
+algorithm---any learning algorithm that gives a classifier that is slightly
+better than random---and transforms it into a \textit{strong} classifier, which does much
+much better than random. To build a bit of intuition for what this means,
+consider a hypothetical digit recognition experiment, where we wish to
+distinguish $0$s from $1$s, and we receive images we must classify. Then a natural
+weak learner might be to take the middle pixel of the image, and if it is
+colored, call the image a $1$, and if it is blank, call the image a $0$. This
+classifier may be far from perfect, but it is likely better than random. Boosting
+procedures proceed by taking a collection of such weak classifiers, and then
+reweighting their contributions to form a classifier with much better accuracy
+than any individual classifier.
+
+With that in mind, let us formulate the problem. Our interpretation of
+boosting is as a coordinate descent method in an infinite dimensional space,
+which---while it sounds complex---is not so bad as it seems. First, we assume
+we have raw input examples $x \in \mathbb R^n$ with labels $y \in \{-1,1\}$, as is usual in
+binary classification. We also assume we have an infinite collection of feature
+functions $\phi_j : \mathbb R^n \mapsto \{-1,1\}$ and an infinite vector $\theta = [\theta_1 \theta_2 \cdots]^\top$, but
+which we assume always has only a finite number of non-zero entries. For
+our classifier we use
+\[
+h_\theta (x) = \operatorname{sign}\left(\sum_{j=1}^\infty \theta_j \phi_j (x) \right).
+\]
+We will abuse notation, and define $\theta^\top \phi(x) = \sum_{j=1}^\infty \theta_j \phi_j (x)$.
+
+In boosting, one usually calls the features $\phi_j$ \textit{weak hypotheses}. Given a
+training set $\{(x^{(1)}, y^{(1)}),\ldots,(x^{(m)},y^{(m)})\}$, we call a vector $p = (p^{(1)},\ldots,p^{(m)})$ a % DIFF: \{\} set
+distribution on the examples if $p^{(i)} \ge 0$ for all $i$ and
+\[
+\sum_{i=1}^m p^{(i)} = 1.
+\]
+Then we say that there is a \textit{weak learner with margin} $\gamma > 0$ if for any
+distribution $p$ on the $m$ training examples there exists one weak hypothesis
+$\phi_j$ such that
+\begin{equation}\label{eq:margin}
+    \sum_{i=1}^m p^{(i)} \mathbb{1}\left\{y^{(i)} \ne \phi_j (x^{(i)} )\right\} \le \frac{1}{2} - \gamma.
+\end{equation}
+That is, we assume that there is \textit{some} classifier that does slightly better than
+random guessing on the dataset. The existence of a weak learning algorithm
+is an assumption, but the surprising thing is that we can transform any weak
+learning algorithm into one with perfect accuracy.
+
+In more generality, we assume we have access to a weak learner, which is
+an algorithm that takes as input a distribution (weights) $p$ on the training
+examples and returns a classifier doing slightly better than random. We will
+show how, given access to a weak learning algorithm, boosting can return a
+classifier with perfect accuracy on the training data. (Admittedly, we would
+like the classifer to generalize well to unseen data, but for now, we ignore
+this issue.)
+
+\begin{algorithm}
+    \begin{itemize}
+        \item[(i)] \textbf{Input:}  A distribution $p^{(1)} ,\ldots,p^{(m)}$ and training set $\{(x^{(i)} ,y^{(i)})\}^m_{i=1}$ with $\sum_{i=1}^m p^{(i)} = 1$ and $p^{(i)} \ge 0$.
+        \item[(ii)] \textbf{Return:} A weak classifier $\phi_j : \mathbb R^n \mapsto \{-1,1\}$ such that
+        \[
+            \sum_{i=1}^m p^{(i)} \mathbb{1}\left\{y^{(i)} \ne \phi_j (x^{(i)} ) \right\} \le \frac{1}{2} - \gamma.
+        \]
+    \end{itemize}
+    \caption{Weak learning algorithm.}\label{alg:weak_learning}
+\end{algorithm}
+
+\subsection{The boosting algorithm}
+Roughly, boosting begins by assigning each training example equal weight
+in the dataset. It then receives a weak-hypothesis that does well according
+to the current weights on training examples, which it incorporates into its
+current classification model. It then reweights the training examples so that
+examples on which it makes mistakes receive higher weight---so that the weak
+learning algorithm focuses on a classifier doing well on those examples---while
+examples with no mistakes receive lower weight. This repeated reweighting
+of the training data coupled with a weak learner doing well on examples for
+which the classifier currently does poorly yields classifiers with good performance.
+
+The boosting algorithm specifically performs \textit{coordinate descent} on the
+exponential loss for classification problems, where the objective is
+\[
+J(\theta) = \frac{1}{m} \sum_{i=1}^m \exp(-y^{(i)} \theta^\top \phi(x^{(i)} )).
+\]
+We first show how to compute the exact form of the coordinate descent
+update for the risk $J(\theta)$. Coordinate descent iterates as follows:
+\begin{itemize}
+    \item[(i)] Choose a coordinate $j \in \mathbb N$.
+    \item[(ii)] Update $\theta_j$ to
+    \[
+        \theta_j = \argmin_{\theta_j} J(\theta)
+    \]
+    while leaving $\theta_k$ identical for all $k \ne j$.
+\end{itemize}
+We iterate the above procedure until convergence.
+
+In the case of boosting, the coordinate updates are not too challenging to
+derive because of the analytic convenience of the $\exp$ function. We now show
+how to derive the update. Suppose we wish to update coordinate $k$. Define
+\[
+w^{(i)} = \exp \left(-y^{(i)} \sum_{j \ne k} \theta_j \phi_j (x^{(i)} )\right)
+\]
+to be a weight, and note that optimizing coordinate $k$ corresponds to minimizing
+\[
+    \sum_{i=1}^m w^{(i)} \exp(-y^{(i)} \phi_k (x^{(i)} )\alpha)
+\]
+in $\alpha = \theta_k$. Now, define
+\[
+    W^+ := \sum_{i:y^{(i)} \phi_k (x^{(i)} )=1} w^{(i)} \quad\text{and}\quad W^- := \sum_{i:y^{(i)} \phi_k (x^{(i)} )=-1} w^{(i)}
+\]
+to be the sums of the weights of examples that $\phi_k$ classifies correctly and
+incorrectly, respectively. Then finding $\theta_k$ is the same as choosing
+\[
+    \alpha = \argmin_\alpha\left\{W^+ e^{-\alpha} + W^- e^\alpha\right\} = \frac{1}{2} \log \frac{W^+}{W^-}.
+\]
+To see the final equality, take derivatives and set the resulting equation to
+zero, so we have $-W^+ e^{-\alpha} + W^- e^\alpha = 0$. That is, $W^- e^{2\alpha} = W^+$, or $\alpha = \frac{1}{2}\log\frac{W^+}{W^-}$.
+
+What remains is to choose the particular coordinate to perform coordinate
+descent on. We assume we have access to a weak-learning algorithm as in
+\cref{alg:weak_learning}, which at iteration $t$ takes as input a distribution $p$ on the training
+set and returns a weak hypothesis $\phi_t$ satisfying the margin condition in \cref{eq:margin}.
+We present the full boosting algorithm in \cref{alg:boosting}. It proceeds in iterations
+$t = 1,2,3,\ldots$. We represent the set of hypotheses returned by the weak
+learning algorithm at time $t$ by $\{\phi_1 ,\ldots,\phi_t\}$.
+
+\section{The convergence of Boosting}
+We now argue that the boosting procedure achieves $0$ training error, and we
+also provide a rate of convergence to zero. To do so, we present a lemma
+that guarantees progress is made.
+
+\begin{lemma}\label{lma:convergence}
+Let
+\[
+J(\theta^{(t)} ) = \frac{1}{m}
+\sum_{i=1}^m \exp\left(-y^{(i)}\sum_{\tau=1}^t \theta_\tau \phi_\tau(x^{(i)})\right).
+\]
+Then
+\[
+J(\theta^{(t)} ) \le \sqrt{1 - 4\gamma^2} J(\theta^{(t-1)}).
+\]
+\end{lemma}
+
+\begin{algorithm}
+    For each iteration $t = 1,2,\ldots$:
+    \begin{itemize}
+        \item[(i)] Define weights
+            \[
+                w^{(i)} = \exp\left( -y^{(i)}\sum_{\tau=1}^{t-1} \theta_\tau \phi_\tau (x^{(i)} )\right)
+            \]
+            and distribution $p^{(i)} = w^{(i)} / \sum^m_{j=1} w^{(j)}$.
+        \item[(ii)] Construct a weak hypothesis $\phi_t : \mathbb R^n \mapsto \{-1,1\}$ from the
+        distribution $p = (p^{(1)} ,\ldots,p^{(m)} )$ on the training set.
+        \item[(iii)] Compute $W^+_t = \sum_{i:y^{(i)} \phi_t (x^{(i)} )=1} w^{(i)}$ and $W^-_t = \sum_{i:y^{(i)} \phi_t (x^{(i)} )=-1} w^{(i)}$ and set
+            \[
+                \theta_t = \frac{1}{2} \log \frac{W^+_t}{W^-_t}.
+            \]
+    \end{itemize}
+    \caption{Boosting algorithm.}\label{alg:boosting}
+\end{algorithm}
+As the proof of the lemma is somewhat involved and not the central focus of
+these notes---though it is important to know one's algorithm will converge!---
+we defer the proof to \cref{sec:boosting_proof}. Let us describe how it guarantees
+convergence of the boosting procedure to a classifier with zero training error.
+
+We initialize the procedure at $\theta^{(0)} = \vec{0}$, so that the initial empirical risk
+$J(\theta^{(0)} ) = 1$. Now, we note that for any $\theta$, the misclassification error satisfies
+\[
+    \mathbb{1}\left\{\operatorname{sign}(\theta^\top \phi(x)) \ne y \right\}  = \mathbb{1}\left\{y\theta^\top\phi(x) \le 0 \right\} \le \exp\left(-y\theta^\top\phi(x) \right)
+\]
+because $e^z \ge 1$ for all $z \ge 0$. Thus, we have that the misclassification error
+rate has upper bound
+\[
+    \frac{1}{m} \sum_{i=1}^m \mathbb{1}\left\{\operatorname{sign}(\theta^\top \phi(x^{(i)})) \ne y^{(i)}\right\} \le J(\theta),
+\]
+and so if $J(\theta) < \frac{1}{m}$ then the vector $\theta$ makes no mistakes on the training data.
+After $t$ iterations of boosting, we find that the empirical risk satisfies
+\[
+J(\theta^{(t)} ) \le (1 - 4\gamma^2 )^{t/2} J(\theta^{(0)}) = (1 - 4\gamma^2)^{t/2}.
+\]
+To find how many iterations are required to guarantee $J(\theta^{(t)} ) < \frac{1}{m}$, we take
+logarithms to find that $J(\theta^{(t)} ) < \frac{1}{m}$ if
+\[
+    \frac{t}{2}\log(1 - 4\gamma^2) < \log \frac{1}{m}, \quad\text{or}\quad t > \frac{2\log m}{-\log(1 - 4\gamma^2)}.
+\]
+Using a first order Taylor expansion, that is, that $\log(1 - 4\gamma^2 ) \le -4\gamma^2$, we
+see that if the number of rounds of boosting---the number of weak classifiers
+we use---satisfies
+\[
+    t > \frac{\log m}{2\gamma^2} \ge \frac{2\log m}{-\log(1 - 4\gamma^2)},
+\]
+then $J(\theta^{(t)} ) < \frac{1}{m}$.
+
+\section{Implementing weak-learners}
+One of the major advantages of boosting algorithms is that they automatically
+generate features from raw data for us. Moreover, because the weak
+hypotheses always return values in $\{-1,1\}$, there is no need to normalize
+features to have similar scales when using learning algorithms, which in practice
+can make a large difference. Additionally, and while this is not
+theoretically well-understood, many types of weak-learning procedures introduce
+non-linearities intelligently into our classifiers, which can yield much more
+expressive models than the simpler linear models of the form $\theta^\top x$ that we
+have seen so far.
+
+\subsection{Decision stumps}
+There are a number of strategies for weak learners, and here we focus on
+one, known as \textit{decision stumps}. For concreteness in this description, let
+us suppose that the input variables $x \in \mathbb R^n$ are real-valued. A decision
+stump is a function $f$, which is parameterized by a threshold $s$ and index
+$j \in {1,2,\ldots,n}$, and returns
+\begin{equation}\label{eq:decision_stump}
+\phi_{j,s}(x) = \operatorname{sign}(x_j - s) = \begin{cases}
+    1 & \text{if } x_j \ge s\\
+    -1 & \text{otherwise.}
+\end{cases}
+\end{equation}
+These classifiers are simple enough that we can fit them efficiently even to a
+weighted dataset, as we now describe.
+
+Indeed, a decision stump weak learner proceeds as follows. We begin with
+a distribution---set of weights $p^{(1)} ,\ldots,p^{(m)}$ summing to $1$---on the training
+set, and we wish to choose a decision stump of the form of \cref{eq:decision_stump} to minimize the
+error on the training set. That is, we wish to find a threshold $s \in \mathbb R$ and
+index $j$ such that
+\begin{equation}\label{eq:decision_err}
+\widehat{\operatorname{Err}}(\phi_j, s, p) = \sum_{i=1}^m p^{(i)} \mathbb{1}\left\{\phi_{j,s} (x^{(i)}) \ne y^{(i)}\right\}
+= \sum_{i=1}^m p^{(i)} \mathbb{1}\left\{y^{(i)} (x^{(i)}_j - s) \le 0\right\}
+\end{equation}
+is minimized. Naively, this could be an inefficient calculation, but a more
+intelligent procedure allows us to solve this problem in roughly $O(n m \log m)$
+time. For each feature $j = 1,2,\ldots,n$, we sort the raw input features so that
+\[
+    x^{(i_1)}_j \ge x^{(i_2)}_j \ge \cdots \ge x^{(i_m)}_j.
+\]
+As the only values $s$ for which the error of the decision stump can change
+are the values $x^{(i)}_j$, a bit of clever book-keeping allows us to compute
+\[
+    \sum_{i=1}^m p^{(i)} \mathbb{1}\left\{y^{(i)} (x^{(i)}_j - s) \le 0 \right\} = \sum_{k=1}^m p^{(i_k)} \mathbb{1}\left\{y^{(i_k)} (x^{(i_k)}_j - s) \le 0\right\}
+\]
+efficiently by incrementally modifying the sum in sorted order, which takes
+time $O(m)$ after we have already sorted the values $x^{(i)}_j$. (We do not describe
+the algorithm in detail here, leaving that to the interested reader.) Thus,
+performing this calcuation for each of the $n$ input features takes total time
+$O(n m \log m)$, and we may choose the index $j$ and threshold $s$ that give the
+best decision stump for the error in \cref{eq:decision_err}.
+
+One \textit{very} important issue to note is that by flipping the sign of the
+thresholded decision stump $\phi_{j,s}$, we achieve error $1 - \widehat{\operatorname{Err}}(\phi_{j,s},p)$, that is, the error
+of
+\[
+    \widehat{\operatorname{Err}}(-\phi_{j,s} ,p) = 1 - \widehat{\operatorname{Err}}(\phi_{j,s} ,p).
+\]
+(You should convince yourself that this is true.) Thus, it is important to also
+track the smallest value of $1 - \widehat{\operatorname{Err}}(\phi_{j,s} ,p)$ over all thresholds, because this
+may be smaller than $\widehat{\operatorname{Err}}(\phi_{j,s} ,p)$, which gives a better weak learner. Using
+this procedure for our weak learner (\cref{alg:weak_learning}) gives the basic, but extremely
+useful, boosting classifier.
+% TODO: Figure. \label{fig:ex_logistic}
+% Figure 3: Best logistic regression classifier using the raw features x \in \mathbb R^2
+% (and a bias term x 0 = 1) for the example considered here.
+
+\begin{example}
+We now give an example showing the behavior of boosting on a simple
+dataset. In particular, we consider a problem with data points $x \in \mathbb R^2$,
+where the optimal classifier is
+\begin{equation}\label{eq:ex_optimal_classifier}    
+y = \begin{cases}
+    1 & \text{if } x_1 < 0.6 \text{ and } x_2 < 0.6\\
+    -1 & \text{otherwise.}
+\end{cases}
+\end{equation}
+This is a simple non-linear decision rule, but it is impossible for standard
+linear classifiers, such as logistic regression, to learn. In \cref{fig:ex_logistic}, we show
+the best decision line that logistic regression learns, where positive examples
+are circles and negative examples are x's. It is clear that logistic regression
+is not fitting the data particularly well.
+
+With boosted decision stumps, however, we can achieve a much better
+fit for the simple nonlinear classification problem \ref{eq:ex_optimal_classifier}. \Cref{fig:ex_boosting} shows the
+boosted classifiers we have learned after different numbers of iterations of
+boosting, using a training set of size $m = 150$. From the figure, we see that
+the first decision stump is to threshold the feature $x_1$ at the value $s \approx 0.23$,
+that is, $\phi(x) = \operatorname{sign}(x_1 - s)$ for $s \approx 0.23$.
+% TODO: Figures. \label{fig:ex_boosting}
+% 2 Iterations
+% 4 Iterations
+% 5 Iterations
+% 10 Iterations
+% Figure 4: Boosted decision stumps after t = 2,4,5, and 10 iterations of boosting, respectively.
+\end{example}
+
+
+\subsection{Other strategies}
+There are a huge number of variations on the basic boosted decision stumps
+idea. First, we do not require that the input features $x_j$ be real-valued. Some
+of them may be categorical, meaning that $x_j \in \{1,2,\ldots,k\}$ for some $k$, in
+which case natural decision stumps are of the form
+\[
+\phi_j (x) = \begin{cases}
+    1 & \text{if } x_j = l\\    
+    -1 & \text{otherwise.}
+\end{cases}
+\]
+as well as variants setting $\phi_j (x) = 1$ if $x_j \in C$ for some set $C \subset \{1,\ldots,k\}$ of
+categories.
+
+Another natural variation is the \textit{boosted decision tree}, in which instead of a
+single level decision for the weak learners, we consider conjuctions of features
+or trees of decisions. Google can help you find examples and information on
+these types of problems.
+
+\section{Proof of \cref{lma:convergence}}\label{sec:boosting_proof}
+We now return to prove the progress lemma. We prove this result by directly
+showing the relationship of the weights at time $t$ to those at time $t - 1$. In
+particular, we note by inspection that
+\[
+    J(\theta^{(t)} ) = \min_\alpha \{W^+_t e^{-\alpha} + W^-_t e^\alpha\} = 2\sqrt{W^+_t W^-_t}
+\]
+while
+\[
+    J(\theta^{(t-1)} ) = \frac{1}{m} \sum^m_{i=1} \exp\left(-y^{(i)}\sum_{\tau=1}^{t-1} \theta_\tau \phi_\tau (x^{(i)} )\right) = W^+_t + W^-_t.
+\]
+
+We know by the weak-learning assumption that
+\[
+    \sum_{i=1}^m p^{(i)} \mathbb{1}\left\{y^{(i)}\ne \phi_t (x^{(i)}) \right\} \le \frac{1}{2}-\gamma, \quad\text{or}\quad \frac{1}{W^+_t + W^-_t} \sum_{\underbrace{i:y^{(i)} \phi_t (x^{(i)} )=-1}_{=W^-_t}} w^{(i)} \le \frac{1}{2} - \gamma.
+\]
+Rewriting this expression by noting that the sum on the right is nothing but
+$W^-_t$, we have
+\[
+    W^-_t \le \left(\frac{1}{2} - \gamma\right) (W^+_t + W^-_t), \quad\text{or}\quad W^+_t \ge \frac{1 + 2\gamma}{1 - 2\gamma}W^-_t.
+\]
+By substituting $\alpha = \frac{1}{2} \log\frac{1+2\gamma}{1-2\gamma}$ in the minimum defining $J(\theta^{(t)} )$, we obtain
+\begin{align*}
+    J(\theta^{(t)} ) &\le W^+_t \sqrt{\frac{1 - 2\gamma}{1 + 2\gamma}} + W^-_t\sqrt{\frac{1 + 2\gamma}{1 - 2\gamma}}\\
+        &= W^+_t\sqrt{\frac{1 - 2\gamma}{1 + 2\gamma}} + W^-_t (1 - 2\gamma + 2\gamma)\sqrt{\frac{1 + 2\gamma}{1 - 2\gamma}}\\
+        &\le W^+_t\sqrt{\frac{1 - 2\gamma}{1 + 2\gamma}} + W^-_t (1 - 2\gamma)\sqrt{\frac{1 + 2\gamma}{1 - 2\gamma}} + 2\gamma\frac{1 - 2\gamma}{1 + 2\gamma}\sqrt{\frac{1 + 2\gamma}{1 - 2\gamma}} W^+_t\\
+        &= W^+_t\left[\sqrt{\frac{1 - 2\gamma}{1 + 2\gamma}} + 2\gamma\sqrt{\frac{1 - 2\gamma}{1 + 2\gamma}}\right] + W^-_t \sqrt{1 - 4\gamma^2},
+\end{align*}
+where we used that $W^-_t \le \frac{1-2\gamma}{1+2\gamma} W^+_t$. Performing a few algebraic
+manipulations, we see that the final expression is equal to $\sqrt{1 - 4\gamma^2} (W^+_t + W^-_t)$. % DIFF: inline.
+That is, $J(\theta^{(t)} ) \le \sqrt{1 - 4\gamma^2} J(\theta^{(t-1)})$.

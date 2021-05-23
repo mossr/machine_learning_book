@@ -118,7 +118,7 @@ discussion are replaced with integrals over $z$.
 
 The last step of this derivation used Jensen's inequality. Specifically,
 $f(x) = \log x$ is a concave function, since $f^{\prime\prime}(x) = -1/x^2 < 0$ over its domain
-$x \in \mathbb R^+$ . Also, the term
+$x \in \mathbb R^+$. Also, the term
 \begin{equation*}
     \sum_{z} Q(z)\left[ \frac{p(x,z;\theta)}{Q(z)} \right]
 \end{equation*}
@@ -189,14 +189,14 @@ the choice of $Q$.
 Recall that all the discussion above was under the assumption that we
 aim to optimize the log-likelihood $\log p(x;\theta)$ for a single example $x$. It turns
 out that with multiple training examples, the basic idea is the same and we
-only needs to take a sum over examples at relevant places. Next, we will
+only need to take a sum over examples at relevant places. Next, we will % TYPO: needs
 build the evidence lower bound for multiple training examples and make the
 EM algorithm formal.
 
 Recall we have a training set $\{x^{(1)} ,\ldots,x^{(n)} \}$. Note that the optimal choice
 of $Q$ is $p(z \mid x;\theta)$, and it depends on the particular example $x$. Therefore here
-we will introduce $n$ distributions $Q_1,\ldots,Q_n$, one for each example $x^{(i)}$ . For
-each example $x^{(i)}$ , we can build the evidence lower bound:
+we will introduce $n$ distributions $Q_1,\ldots,Q_n$, one for each example $x^{(i)}$. For
+each example $x^{(i)}$, we can build the evidence lower bound:
 \begin{equation*}
     \log p(x^{(i)} ;\theta) \ge \operatorname{ELBO}(x^{(i)} ;Q_i ,\theta) = \sum_{z^{(i)}} Q_i(z^{(i)})\log\frac{p(x^{(i)},z^{(i)} ;\theta)}{Q_i (z^{(i)})}
 \end{equation*}
@@ -217,7 +217,7 @@ Thus, we simply set the $Q_i$'s to be the posterior distribution of the $z^{(i)}
 given $x^{(i)}$ with the current setting of the parameters $\theta$.
 
 Now, for this choice of the $Q_i$'s, \cref{eq:lb_ll} gives a lower-bound on
-the loglikelihood $\ell$ that we're trying to maximize. This is the E-step. In
+the log-likelihood $\ell$ that we're trying to maximize. This is the E-step. In
 the M-step of the algorithm, we then maximize our formula in \cref{eq:lb_ll}
 with respect to the parameters to obtain a new setting of the $\theta$'s. Repeatedly
 carrying out these two steps gives us the EM algorithm, which is as follows:
@@ -250,7 +250,7 @@ We saw earlier that this choice ensures that Jensen's inequality, as applied to 
 The parameters $\theta^{(t+1)}$ are then obtained by maximizing the right hand side
 of the equation above. Thus,
 \begin{align*}
-    \ell(\theta^{(t+1)} ) &\ge \sum_{i=1}^n \operatorname{ELBO}(x^{(i)} ;Q^{(t)}_i,\theta^{(t+1)}) \tag{because ineqaulity \ref{eq:lb_ll} holds for all $Q$ and $\theta$}\\
+    \ell(\theta^{(t+1)} ) &\ge \sum_{i=1}^n \operatorname{ELBO}(x^{(i)} ;Q^{(t)}_i,\theta^{(t+1)}) \tag{because inequality \ref{eq:lb_ll} holds for all $Q$ and $\theta$}\\ % TYPO: ineqaulity
         &\ge \sum_{i=1}^n \operatorname{ELBO}(x^{(i)} ;Q^{(t)}_i ,\theta^{(t)} ) \tag{see reason below}\\
         &= \ell(\theta^{(t)} ) \tag{by \cref{eq:lb_equality}}
 \end{align*}
@@ -324,7 +324,7 @@ $\phi,\mu,\Sigma$, the quantity:
         &= \sum_{i=1}^n \sum_{j=1}^k Q_i (z^{(i)} = j) \log\frac{p(x^{(i)} \mid z^{(i)} = j;\mu,\Sigma)p(z^{(i)} = j;\phi)}{Q_i (z^{(i)} = j)}\\
         &= \sum_{i=1}^n \sum_{j=1}^k w^{(i)}_j \log\frac{\frac{1}{(2\pi)^{d/2} |\Sigma_j|^{1/2}} \exp\left(- \frac 1 2 (x^{(i)} - \mu_j )^\top \Sigma^{-1}_j (x^{(i)} - \mu_j ) \right) \cdot \phi_j}{w^{(i)}_j}    
 \end{align*}
-Let's maximize this with respect to $\mu_l$ . If we take the derivative with respect
+Let's maximize this with respect to $\mu_l$. If we take the derivative with respect
 to $\mu_l$, we find:
 \begin{align*}
     \nabla_{\mu_l} &\sum_{i=1}^n \sum_{j=1}^k w^{(i)}_j \log\frac{\frac{1}{(2\pi)^{d/2} |\Sigma_j|^{1/2}}\exp \left( -\frac{1}{2} (x^{(i)} - \mu_j)^\top \Sigma^{-1}_j (x^{(i)} - \mu_j) \right) \cdot \phi_j}{w^{(i)}_j}\\
@@ -348,7 +348,7 @@ However, there is an additional constraint that the $\phi_j$'s sum to $1$, since
 represent the probabilities $\phi_j = p(z^{(i)} = j;\phi)$. To deal with the constraint
 that $\sum^k_{j=1} \phi_j = 1$, we construct the Lagrangian
 \begin{equation*}
-    \mathcal L(\phi) = \sum_{i=1}^n \sum_{j=1}^k w^{(i)}_j \log\phi_j + \beta(\sum_{j=1}^k \phi_j - 1),
+    \mathcal L(\phi) = \sum_{i=1}^n \sum_{j=1}^k w^{(i)}_j \log\phi_j + \beta\left(\sum_{j=1}^k \phi_j - 1\right),
 \end{equation*}
 where $\beta$ is the Lagrange multiplier.\footnote{
 We don't need to worry about the constraint that $\phi_j \ge 0$, because as we'll shortly see,
@@ -362,7 +362,7 @@ Setting this to zero and solving, we get:
     \phi_j = \frac{\sum^n_{i=1} w^{(i)}_j}{-\beta}
 \end{equation*}
 I.e., $\phi_j \propto \sum^n_{i=1} w^{(i)}_j$. Using the constraint that
-$\sum_j \phi_j = 1$, we easily find that $-\beta = \sum^n_{i=1} \sum_k j=1 w^{(i)}_j = \sum^n_{i=1} 1 = n$.
+$\sum_j \phi_j = 1$, we easily find that $-\beta = \sum^n_{i=1} \sum^k_{j=1} w^{(i)}_j = \sum^n_{i=1} 1 = n$.
 (This used the fact that $w^{(i)}_j = Q_i (z^{(i)} = j$), and since probabilities sum to $1$,
 $\sum_j w^{(i)}_j = 1$.) We therefore
 have our M-step updates for the parameters $\phi_j$:
@@ -374,7 +374,7 @@ straightforward.
 
 \vspace{1cm}
 \begin{fullwidth}
-\inlinechapter{Variational inference and variational auto-encoder}\label{cha:variational}
+\inlinechapter{($\dagger$) Variational inference and variational auto-encoder}\label{cha:variational}
 \end{fullwidth}
 Loosely speaking, variational auto-encoder\cite{kingma2013auto} generally refers to a family of
 algorithms that extend the EM algorithms to more complex models

@@ -32,7 +32,7 @@ to the labels $\{0,1\}$, (such as the perceptron algorithm) are called \textbf{d
 learning algorithms. Here, we'll talk about algorithms that instead
 try to model $p(x \mid y)$ (and $p(y)$). These algorithms are called \textbf{generative}
 learning algorithms. For instance, if $y$ indicates whether an example is a
-dog (0) or an elephant (1), then $p(x \mid y = 0)$ models the distribution of dogs'
+dog ($0$) or an elephant ($1$), then $p(x \mid y = 0)$ models the distribution of dogs'
 features, and $p(x \mid y = 1)$ models the distribution of elephants' features.
 
 After modeling $p(y)$ (called the \textbf{class priors}) and $p(x \mid y)$, our algorithm
@@ -58,7 +58,7 @@ according to a multivariate normal distribution. Let's talk briefly about the
 properties of multivariate normal distributions before moving on to the GDA
 model itself.
 
-The multivariate normal distribution in d-dimensions, also called the multivariate
+The multivariate normal distribution in $d$-dimensions, also called the multivariate
 Gaussian distribution, is parameterized by a \textbf{mean vector} $\mu \in \mathbb{R}^d$
 and a covariance matrix $\Sigma \in \mathbb{R}^{d \times d}$, where $\Sigma \ge 0$ is symmetric and positive
 semi-definite. Also written ``$\mathcal N(\mu,\Sigma)$'', its density is given by:
@@ -97,7 +97,7 @@ and as it becomes smaller, the distribution becomes more ``compressed.''
 Let's look at some more examples.
 % TODO: multivariate surface plots
 
-The figures above show Gaussians with mean 0, and with covariance
+The figures above show Gaussians with mean $0$, and with covariance
 matrices respectively:
 \begin{equation}
     \Sigma = \begin{bmatrix}
@@ -518,7 +518,7 @@ generated is via a random process in which spam/non-spam is first determined
 (according to $p(y)$) as before. Then, the sender of the email writes the
 email by first generating $x_1$ from some multinomial distribution over words
 ($p(x_1 \mid y)$). Next, the second word $x_2$ is chosen independently of $x_1$ but from
-the same multinomial distribution, and similarly for $x_3$ , $x_4$ , and so on, until
+the same multinomial distribution, and similarly for $x_3$, $x_4$, and so on, until
 all $d$ words of the email have been generated. Thus, the overall probability of
 a message is given by $p(y)
 \prod^d_{j=1} p(x_j \mid y)$. Note that this formula looks like the

@@ -67,7 +67,7 @@ Similarly, the corresponding stochastic gradient descent update rule is: % DIFF:
 The gradient descent update, or stochastic gradient update above becomes
 computationally expensive when the features $\phi(x)$ is high-dimensional. For
 example, consider the direct extension of the feature map in equation \ref{eq:feature_map} to
-high-dimensional input $x$: suppose $x \in \mathbb{R}^d$ , and let $\phi(x)$ be the vector that
+high-dimensional input $x$: suppose $x \in \mathbb{R}^d$, and let $\phi(x)$ be the vector that
 contains all the monomials of $x$ with degree $\le 3$
 \begin{equation}
     \phi(x) = \begin{bmatrix}
@@ -96,7 +96,7 @@ vector, which is $10^6$ times slower than the update rule for for ordinary least
 squares updates in equation \ref{eq:lms_features}. % DIFF: added "in equation"
 
 It may appear at first that such $d^3$ runtime per update and memory usage
-are inevitable, because the vector $\theta$ itself is of dimension $p \approx d^3$ , and we may
+are inevitable, because the vector $\theta$ itself is of dimension $p \approx d^3$, and we may
 need to update every entry of $\theta$ and store it. However, we will introduce the
 kernel trick with which we will not need to store $\theta$ explicitly, and the runtime
 can be significantly improved.
@@ -310,7 +310,7 @@ notation and used $K$ to denote both the kernel function $K(x,z)$ and the
 kernel matrix $K$, due to their obvious close relationship.
 
 Now, if $K$ is a valid kernel, then $K_{ij} = K(x^{(i)} ,x^{(j)} ) = \phi(x^{(i)} )^\top \phi(x^{(j)} ) =
-\phi(x^{(j)} )^\top \phi(x^{(i)} ) = K(x^{(j)} ,x^{(i)} ) = K_{ji}$ , and hence $K$ must be symmetric. Moreover,
+\phi(x^{(j)} )^\top \phi(x^{(i)} ) = K(x^{(j)} ,x^{(i)} ) = K_{ji}$, and hence $K$ must be symmetric. Moreover,
 letting $\phi_k (x)$ denote the $k$-th coordinate of the vector $\phi(x)$, we find that
 for any vector $z$, we have
 \begin{align*}

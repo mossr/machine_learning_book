@@ -27,7 +27,7 @@ For instance, in our first example above, the model $M_i$ would be an $i$-th
 order polynomial regression model. (The generalization to infinite $\mathcal M$ is not
 hard.\footnote{
 If we are trying to choose from an infinite set of models, say corresponding to the
-possible values of the bandwidth $\tau \in \mathbb R^+$ , we may discretize $\tau$ and consider only a finite
+possible values of the bandwidth $\tau \in \mathbb R^+$, we may discretize $\tau$ and consider only a finite
 number of possible values for it. More generally, most of the algorithms described here
 can all be viewed as performing optimization search in the space of models, and we can
 perform this search over infinite model classes as well.}) Alternatively, if we are trying to decide between using an SVM, a
@@ -56,7 +56,7 @@ Here's an algorithm that works better. In \textbf{hold-out cross validation}
 (also called \textbf{simple cross validation}), we do the following:
 \begin{enumerate}
     \item Randomly split $S$ into $S_\text{train}$ (say, $70\%$ of the data) and $S_\text{cv}$ (the remaining $30\%$). Here, $S_\text{cv}$ is called the hold-out cross validation set.
-    \item Train each model $M_i$ on $S_\text{train}$ only, to get some hypothesis $h_i$ .
+    \item Train each model $M_i$ on $S_\text{train}$ only, to get some hypothesis $h_i$.
     \item Select and output the hypothesis $h_i$ that had the smallest error $\hat{\varepsilon}_{S_\text{cv}}(h_i)$ on the hold out cross validation set. (Recall,  $\hat{\varepsilon}_{S_\text{cv}}(h)$ denotes the empirical error of $h$ on the set of examples in $S_\text{cv}$.)
 \end{enumerate}
 
@@ -191,7 +191,7 @@ One possible choice of the score would be define $S(i)$ to be (the absolute
 value of) the correlation between $x_i$ and $y$, as measured on the training data.
 This would result in our choosing the features that are the most strongly
 correlated with the class labels. In practice, it is more common (particularly
-for discrete-valued features $x_i$ ) to choose $S(i)$ to be the mutual information
+for discrete-valued features $x_i$) to choose $S(i)$ to be the mutual information
 $\operatorname{MI}(x_i ,y)$ between $x_i$ and $y$:
 \begin{equation}
     \operatorname{MI}(x_i ,y) = \sum_{x_i \in \{0,1\}} \sum_{y \in \{0,1\}} p(x_i ,y)\log \frac{p(x_i ,y)}{p(x_i )p(y)}
@@ -423,7 +423,7 @@ regularizes the model as well!
 \vspace{1cm}
 \inlinechapter{Bias-variance and error analysis}
 \marginnote{From CS229 Fall 2017, Yoann Le Calonnec, Stanford University.}
-\section{The bias-variance tradeoff}
+\section{($*$) The bias-variance tradeoff}
 Assume you are given a well fitted machine learning model $\hat{f}$ that you want to apply on
 some test dataset. For instance, the model could be a linear regression whose parameters
 were computed using some training set different from your test set. For each point $x$ in your

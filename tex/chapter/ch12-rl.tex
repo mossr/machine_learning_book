@@ -1,0 +1,663 @@
+\titlespacing*{\part}{0pt}{-20pt}{30pt} % to fix table and plot together on the first page (SEE RESTORE AT BOTTOM)
+\titlespacing*{\chapter}{0pt}{-10pt}{30pt}
+
+\begin{fullwidth}
+\part{Reinforcement Learning and Control}
+\label{part:rl}
+\end{fullwidth}
+
+\marginnote{From CS229 Spring 2021, Andrew Ng, Moses Charikar \& Christopher R\'e, Stanford University.}
+
+We now begin our study of reinforcement learning and adaptive control.
+
+In supervised learning, we saw algorithms that tried to make their outputs
+mimic the labels $y$ given in the training set. In that setting, the labels gave
+an unambiguous ``right answer'' for each of the inputs $x$. In contrast, for
+many sequential decision making and control problems, it is very difficult to
+provide this type of explicit supervision to a learning algorithm. For example,
+if we have just built a four-legged robot and are trying to program it to walk,
+then initially we have no idea what the ``correct'' actions to take are to make
+it walk, and so do not know how to provide explicit supervision for a learning
+algorithm to try to mimic.
+
+In the reinforcement learning framework, we will instead provide our
+algorithms only a reward function, which indicates to the learning agent when
+it is doing well, and when it is doing poorly. In the four-legged walking
+example, the reward function might give the robot positive rewards for
+moving forwards, and negative rewards for either moving backwards or falling
+over. It will then be the learning algorithm's job to figure out how to choose
+actions over time so as to obtain large rewards.
+
+Reinforcement learning has been successful in applications as diverse as
+autonomous helicopter flight, robot legged locomotion, cell-phone network
+routing, marketing strategy selection, factory control, and efficient web-page
+indexing. Our study of reinforcement learning will begin with a definition of
+the \textbf{Markov decision processes} (MDP), which provides the formalism in
+which RL problems are usually posed.
+
+\chapter{Markov decision processes}\label{sec:mdp}
+A Markov decision process is a tuple $\langle S,A,\{P_{sa}\},\gamma,R\rangle$, where: % DIFF: \langle \rangle
+\begin{itemize}
+    \item $S$ is a set of \textbf{states}. (For example, in autonomous helicopter flight, $S$
+    might be the set of all possible positions and orientations of the helicopter.)
+    \item $A$ is a set of \textbf{actions}. (For example, the set of all possible directions in
+    which you can push the helicopter's control sticks.)
+    \item $P_{sa}$ are the state transition probabilities. For each state $s \in S$ and
+    action $a \in A$, $P_{sa}$ is a distribution over the state space. We'll say more
+    about this later, but briefly, $P_{sa}$ gives the distribution over what states
+    we will transition to if we take action $a$ in state $s$.
+    \item $\gamma \in [0,1)$ is called the \textbf{discount factor}.
+    \item $R : S \times A \mapsto \mathbb R$ is the \textbf{reward function}. (Rewards are sometimes also
+    written as a function of a state $S$ only, in which case we would have $R : S \mapsto \mathbb R$).
+\end{itemize}
+
+The dynamics of an MDP proceeds as follows: We start in some state $s_0$,
+and get to choose some action $a_0 \in A$ to take in the MDP. As a result of our
+choice, the state of the MDP randomly transitions to some successor state
+$s_1$, drawn according to $s_1 \sim P_{s_0a_0}$. Then, we get to pick another action $a_1$.
+As a result of this action, the state transitions again, now to some $s_2 \sim P_{s_1 a_1}$.
+We then pick $a_2$, and so on. Pictorially, we can represent this process as follows:
+\[
+s_0 \overset{a_0}{\longrightarrow} s_1 \overset{a_1}{\longrightarrow} s_2 \overset{a_2}{\longrightarrow} s_3 \overset{a_3}{\longrightarrow} \ldots
+\]
+
+Upon visiting the sequence of states $s_0,s_1,\ldots$ with actions $a_0, a_1,\ldots$, our
+total payoff is given by
+\[
+    R(s_0,a_0) + \gamma R(s_1,a_1) + \gamma^2 R(s_2,a_2) + \cdots.
+\]
+Or, when we are writing rewards as a function of the states only, this becomes
+\[
+    R(s_0) + \gamma R(s_1) + \gamma^2 R(s_2) + \cdots.
+\]
+For most of our development, we will use the simpler state-rewards $R(s)$,
+though the generalization to state-action rewards $R(s,a)$ offers no special
+difficulties.
+
+Our goal in reinforcement learning is to choose actions over time so as to
+maximize the expected value of the total payoff:
+\[
+\mathbb E \left[R(s_0) + \gamma R(s_1) + \gamma^2 R(s_2) + \cdots\right] % DIFF: \mathbb E
+\]
+Note that the reward at timestep $t$ is \textbf{discounted} by a factor of $\gamma^t$. Thus, to
+make this expectation large, we would like to accrue positive rewards as soon
+as possible (and postpone negative rewards as long as possible). In economic
+applications where $R(\cdot)$ is the amount of money made, $\gamma$ also has a natural
+interpretation in terms of the interest rate (where a dollar today is worth
+more than a dollar tomorrow).
+
+A \textbf{policy} is any function $\pi : S \mapsto A$ mapping from the states to the
+actions. We say that we are \textbf{executing} some policy $\pi$ if, whenever we are
+in state $s$, we take action $a = \pi(s)$. We also define the value function for
+a policy $\pi$ according to
+\[
+    V^\pi(s) = \mathbb E \left[R(s_0) + \gamma R(s_1 ) + \gamma^2 R(s_2) + \cdots \mid s_0 = s, \pi \right].
+\]
+$V^\pi(s)$ is simply the expected sum of discounted rewards upon starting in
+state $s$, and taking actions according to $\pi$.\footnote{
+This notation in which we condition on $\pi$ isn't technically correct because $\pi$ isn't a
+random variable, but this is quite standard in the literature.}
+
+Given a fixed policy $\pi$, its value function $V^\pi$ satisfies the Bellman equations:
+\[
+    V^\pi(s) = R(s) + \gamma \sum_{s' \in S} P_{s\pi(s)}(s')V^\pi(s').
+\]
+This says that the expected sum of discounted rewards $V^\pi(s)$ for starting
+in $s$ consists of two terms: First, the \textbf{immediate reward} $R(s)$ that we get
+right away simply for starting in state $s$, and second, the expected sum of
+future discounted rewards. Examining the second term in more detail, we
+see that the summation term above can be rewritten $\mathbb E_{s'\sim P_{s\pi(s)}}[V^\pi(s')]$. This
+is the expected sum of discounted rewards for starting in state $s'$, where $s'$
+is distributed according $P_{s\pi(s)}$, which is the distribution over where we will
+end up after taking the first action $\pi(s)$ in the MDP from state $s$. Thus, the
+second term above gives the expected sum of discounted rewards obtained
+after the first step in the MDP.
+
+Bellman's equations can be used to efficiently solve for $V^\pi$. Specifically,
+in a finite-state MDP ($|S| < \infty$), we can write down one such equation for $V^\pi(s)$
+for every state $s$. This gives us a set of $|S|$ linear equations in $|S|$
+variables (the unknown $V^\pi(s)$'s, one for each state), which can be efficiently
+solved for the $V^\pi(s)$'s.
+
+We also define the \textbf{optimal value function} according to
+\begin{equation}\label{eq:optimal_value_function}
+V^*(s) = \max_\pi V^\pi(s).
+\end{equation}
+In other words, this is the best possible expected sum of discounted rewards
+that can be attained using any policy. There is also a version of Bellman's
+equations for the optimal value function:
+\begin{equation}\label{eq:bellman_opt_value}
+    V^*(s) = R(s) + \max_{a\in A} \gamma \sum_{s'\in S} P_{sa}(s')V^*(s').    
+\end{equation}
+The first term above is the immediate reward as before. The second term
+is the maximum over all actions $a$ of the expected future sum of discounted
+rewards we'll get upon after action $a$. You should make sure you understand
+this equation and see why it makes sense. (A derivation for \cref{eq:bellman_opt_value} and
+the \cref{eq:opt_policy} below are given in \cref{sec:bellman_derivation})
+We also define a policy $\pi^* : S \mapsto A$ as follows:
+\begin{equation}\label{eq:opt_policy}
+    \pi^*(s) = \argmax_{a\in A} \sum_{s'\in S} P_{sa}(s')V^*(s').
+\end{equation}
+Note that $\pi^*(s)$ gives the action $a$ that attains the maximum in the ``$\max$''
+in \cref{eq:bellman_opt_value}.
+
+It is a fact that for every state $s$ and every policy $\pi$, we have
+\[
+    V^*(s) = V^{\pi^*}(s) \ge V^\pi(s).
+\]
+The first equality says that the $V^{\pi^*}$, the value function for $\pi^*$, is equal to the
+optimal value function $V^*$ for every state $s$. Further, the inequality above
+says that $\pi^*$'s value is at least as large as the value of any other other policy. % TYPO: "a large" -> "as large"
+In other words, $\pi^*$ as defined in \cref{eq:opt_policy} is the optimal policy.
+
+Note that $\pi^*$ has the interesting property that it is the optimal policy for
+all states $s$. Specifically, it is not the case that if we were starting in some
+state $s$ then there'd be some optimal policy for that state, and if we were
+starting in some other state $s'$ then there'd be some other policy that's
+optimal policy for $s'$. The same policy $\pi^*$ attains the maximum in \cref{eq:optimal_value_function}
+for all states $s$. This means that we can use the same policy $\pi^*$ no matter
+what the initial state of our MDP is.
+
+\chapter{Value iteration and policy iteration}\label{sec:vi_pi}
+We now describe two efficient algorithms for solving finite-state MDPs. For
+now, we will consider only MDPs with finite state and action spaces ($|S| < \infty$, $|A| < \infty$). In this section, we will also assume that we know the state
+transition probabilities $\{P_{sa}\}$ and the reward function $R$.
+
+The first algorithm, \textbf{value iteration}, is as follows:
+\begin{algorithm}[ht]
+    \caption{Value iteration.}
+    \label{alg:vi}
+    \begin{algorithmic}
+    \State For each state $s$, initialize $V(s) := 0$.
+    \Repeat
+        \For{every state $s$, update} % DIFF: $s$
+            \State \begin{equation}\label{eq:value_iteration}
+                V(S) := R(s) + \max_{a \in A} \gamma \sum_{s'} P_{sa}(s') V(s').
+            \end{equation}
+        \EndFor
+    \Until{convergence}
+    \end{algorithmic}
+\end{algorithm}
+
+This algorithm can be thought of as repeatedly trying to update the
+estimated value function using the Bellman \cref{eq:bellman_opt_value}.
+
+There are two possible ways of performing the updates in the inner loop
+of the algorithm. In the first, we can first compute the new values for $V(s)$ for
+every state $s$, and then overwrite all the old values with the new values. This
+is called a \textbf{synchronous} update. In this case, the algorithm can be viewed as
+implementing a ``Bellman backup operator'' that takes a current estimate of
+the value function, and maps it to a new estimate. (See homework problem
+for details.) Alternatively, we can also perform \textbf{asynchronous} updates.
+Here, we would loop over the states (in some order), updating the values one
+at a time.
+
+Under either synchronous or asynchronous updates, it can be shown that
+value iteration will cause $V$ to converge to $V^*$. Having found $V^*$, we can
+then use \cref{eq:opt_policy} to find the optimal policy.
+
+Apart from value iteration, there is a second standard algorithm for
+finding an optimal policy for an MDP. The \textbf{policy iteration} algorithm proceeds
+as follows:
+\begin{algorithm}[ht]
+    \caption{Policy iteration.}
+    \label{alg:pi}
+    \begin{algorithmic}
+    \State Initialize $\pi$ randomly.
+    \Repeat
+        \State Let $V := V^\pi$. \algorithmiccomment{typically by linear system solver}
+        \For{every state $s$, update}
+            \State \begin{equation}
+                \pi(s) := \argmax_{a \in A} \sum_{s'} P_{sa}(s')V(s').
+            \end{equation}
+        \EndFor
+    \Until{convergence}
+    \end{algorithmic}
+\end{algorithm}
+
+Thus, the inner-loop repeatedly computes the value function for the
+current policy, and then updates the policy using the current value function.
+(The policy $\pi$ found in step (b) is also called the policy that is \textbf{greedy with
+respect to $V$}.) Note that step (a) can be done via solving Bellman's
+equations as described earlier, which in the case of a fixed policy, is just a set of
+$|S|$ linear equations in $|S|$ variables.
+
+After at most a \textit{finite} number of iterations of this algorithm, $V$ will
+converge to $V^*$, and $\pi$ will converge to $\pi^*$.\footnote{
+Note that value iteration cannot reach the exact $V^*$ in a finite number of iterations,
+whereas policy iteration with an exact linear system solver, can. This is because when
+the actions space and policy space are discrete and finite, and once the policy reaches the
+optimal policy in policy iteration, then it will not change at all. On the other hand, even
+though value iteration will converge to the $V^*$, but there is always some non-zero error in
+the learned value function.}
+
+Both value iteration and policy iteration are standard algorithms for
+solving MDPs, and there isn't currently universal agreement over which
+algorithm is better. For small MDPs, policy iteration is often very fast and % TYPO: "fats" -> "fast"
+converges with very few iterations. However, for MDPs with large state spaces,
+solving for $V^\pi$ explicitly would involve solving a large system of linear
+equations, and could be difficult (and note that one has to solve the linear system
+multiple times in policy iteration). In these problems, value iteration may be
+preferred. For this reason, in practice value iteration seems to be used more
+often than policy iteration. For some more discussions on the comparison
+and connection of value iteration and policy iteration, please see \cref{sec:connections_pi_vi}.
+
+\chapter{Learning a model for an MDP}
+So far, we have discussed MDPs and algorithms for MDPs assuming that the
+state transition probabilities and rewards are known. In many realistic
+problems, we are not given state transition probabilities and rewards explicitly,
+but must instead estimate them from data. (Usually, $S$, $A$, and $\gamma$ are known.) %DIFF: Oxform comma
+
+For example, suppose that, for the inverted pendulum problem (see
+problem set 4), we had a number of trials in the MDP, that proceeded as follows:
+\begin{align*}
+    &s_0^{(1)} \overset{a_0^{(1)}}{\longrightarrow} s_1^{(1)} \overset{a_1^{(1)}}{\longrightarrow} s_2^{(1)} \overset{a_2^{(1)}}{\longrightarrow} s_3^{(1)} \overset{a_3^{(1)}}{\longrightarrow} \ldots\\
+    &s_0^{(2)} \overset{a_0^{(2)}}{\longrightarrow} s_1^{(2)} \overset{a_1^{(2)}}{\longrightarrow} s_2^{(2)} \overset{a_2^{(2)}}{\longrightarrow} s_3^{(2)} \overset{a_3^{(2)}}{\longrightarrow} \ldots\\
+    &\ldots
+\end{align*}
+
+Here, $s^{(j)}_i$ is the state we were at time $i$ of trial $j$, and $a^{(j)}_i$
+is the corresponding action that was taken from that state. In practice, each of the
+trials above might be run until the MDP terminates (such as if the pole falls
+over in the inverted pendulum problem), or it might be run for some large
+but finite number of timesteps.
+
+Given this ``experience'' in the MDP consisting of a number of trials,
+we can then easily derive the maximum likelihood estimates for the state
+transition probabilities:
+\begin{equation}\label{eq:transition_mle}
+    P_{sa}(s') = \frac{\text{\# times we took action $a$ in state $s$ and got to $s'$}}{\text{\# times we took action $a$ in state $s$}} % TYPO: "took we"
+\end{equation}
+Or, if the ratio above is ``$0/0$''---corresponding to the case of never having
+taken action $a$ in state $s$ before---the we might simply estimate $P_{sa}(s')$ to be
+$1/|S|$ (i.e., estimate $P_{sa}$ to be the uniform distribution over all states.) % DIFF: "I.e." to "i.e." without new sentence
+
+Note that, if we gain more experience (observe more trials) in the MDP,
+there is an efficient way to update our estimated state transition probabilities
+using the new experience. Specifically, if we keep around the counts for both
+the numerator and denominator terms of \cref{eq:transition_mle}, then as we observe more trials,
+we can simply keep accumulating those counts. Computing the ratio of these
+counts then given our estimate of $P_{sa}$.
+
+Using a similar procedure, if $R$ is unknown, we can also pick our estimate
+of the expected immediate reward $R(s)$ in state $s$ to be the average reward
+observed in state $s$.
+
+Having learned a model for the MDP, we can then use either value
+iteration or policy iteration to solve the MDP using the estimated transition
+probabilities and rewards. For example, putting together model learning and
+value iteration, here is one possible algorithm for learning in an MDP with
+unknown state transition probabilities:
+\begin{enumerate}
+    \item Initialize $\pi$ randomly.
+    \item Repeat:
+    \begin{enumerate}
+        \item[(a)] Execute $\pi$ in the MDP for some number of trials.
+        \item[(b)] Using the accumulated experience in the MDP, update our estimates for $P_{sa}$ (and $R$, if applicable).
+        \item[(c)] Apply value iteration with the estimated state transition probabilities and rewards to get a new estimated value function $V$.
+        \item[(d)] Update $\pi$ to be the greedy policy with respect to $V$.
+    \end{enumerate}
+\end{enumerate}
+
+We note that, for this particular algorithm, there is one simple optimization
+that can make it run much more quickly. Specifically, in the inner loop
+of the algorithm where we apply value iteration, if instead of initializing value
+iteration with $V = 0$, we initialize it with the solution found during the previous
+iteration of our algorithm, then that will provide value iteration with
+a much better initial starting point and make it converge more quickly.
+
+\chapter{Continuous state MDPs}
+So far, we've focused our attention on MDPs with a finite number of states.
+We now discuss algorithms for MDPs that may have an infinite number of
+states. For example, for a car, we might represent the state as $(x,y,\theta, \dot{x}, \dot{y}, \dot{\theta})$,
+comprising its position $(x,y)$; orientation $\theta$; velocity in the $x$ and $y$ directions
+$\dot{x}$ and $\dot{y}$; and angular velocity $\dot{\theta}$. Hence, $S = \mathbb R^6$ is an infinite set of states,
+because there is an infinite number of possible positions and orientations
+for the car.\footnote{
+Technically, $\theta$ is an orientation and so the range of $\theta$ is better written $\theta \in [-\pi,\pi)$ than
+$\theta \in \mathbb R$; but for our purposes, this distinction is not important.} Similarly, the inverted pendulum you saw in PS4 has states
+$(x,\theta, \dot{x}, \dot{\theta})$, where $\theta$ is the angle of the pole. And, a helicopter flying in 3d
+space has states of the form $(x,y,z,\phi,\theta,\psi, \dot{x}, \dot{y}, \dot{z}, \dot{\phi}, \dot{\theta}, \dot{\psi})$, where here the roll
+$\phi$, pitch $\theta$, and yaw $\psi$ angles specify the 3d orientation of the helicopter.
+
+In this section, we will consider settings where the state space is $S = \mathbb R^d$,
+and describe ways for solving such MDPs.
+
+\section{Discretization}
+Perhaps the simplest way to solve a continuous-state MDP is to discretize
+the state space, and then to use an algorithm like value iteration or policy
+iteration, as described previously.
+
+For example, if we have 2d states $(s_1,s_2)$, we can use a grid to discretize
+the state space:
+% TODO: Grid figure.
+
+Here, each grid cell represents a separate discrete state $\bar{s}$. We can then
+approximate the continuous-state MDP via a discrete-state one $(\bar{S},A,\{P_{\bar{s}a}\},\gamma,R)$,
+where $\bar{S}$ is the set of discrete states, $\{P_{\bar{s}a}\}$ are our state transition
+probabilities over the discrete states, and so on. We can then use value iteration or
+policy iteration to solve for the $V^*(\bar{s})$ and $\pi^*(\bar{s})$ in the discrete state MDP
+$(\bar{S},A,\{P_{\bar{s}a}\},\gamma,R)$. When our actual system is in some continuous-valued
+state $s \in S$ and we need to pick an action to execute, we compute the
+corresponding discretized state $\bar{s}$, and execute action $\pi^*(\bar{s})$.
+
+This discretization approach can work well for many problems. However,
+there are two downsides. First, it uses a fairly naive representation for $V^*$
+(and $\pi^*$). Specifically, it assumes that the value function is takes a constant
+value over each of the discretization intervals (i.e., that the value function is
+piecewise constant in each of the gridcells).
+
+To better understand the limitations of such a representation, consider a
+supervised learning problem of fitting a function to this dataset:
+% TODO: Figure.
+
+Clearly, linear regression would do fine on this problem. However, if we
+instead discretize the $x$-axis, and then use a representation that is piecewise
+constant in each of the discretization intervals, then our fit to the data would
+look like this:
+% TODO: Figure (step-wise)
+
+This piecewise constant representation just isn't a good representation for
+many smooth functions. It results in little smoothing over the inputs, and no
+generalization over the different grid cells. Using this sort of representation,
+we would also need a very fine discretization (very small grid cells) to get a
+good approximation.
+
+A second downside of this representation is called the curse of dimensionality.
+Suppose $S = \mathbb R^d$, and we discretize each of the $d$ dimensions of the
+state into $k$ values. Then the total number of discrete states we have is $k^d$.
+This grows exponentially quickly in the dimension of the state space $d$, and
+thus does not scale well to large problems. For example, with a 10d state, if
+we discretize each state variable into $100$ values, we would have $100^10$ = $10^20$
+discrete states, which is far too many to represent even on a modern desktop
+computer.
+
+As a rule of thumb, discretization usually works extremely well for 1d
+and 2d problems (and has the advantage of being simple and quick to
+implement). Perhaps with a little bit of cleverness and some care in choosing
+the discretization method, it often works well for problems with up to 4d
+states. If you're extremely clever, and somewhat lucky, you may even get it
+to work for some 6d problems. But it very rarely works for problems any
+higher dimensional than that.
+
+\section{Value function approximation}
+We now describe an alternative method for finding policies in continuous-state
+MDPs, in which we approximate $V^*$ directly, without resorting to
+discretization. This approach, called \textbf{value function approximation}, has been
+successfully applied to many RL problems.
+
+\subsection{Using a model or simulator}
+To develop a value function approximation algorithm, we will assume that
+we have a \textbf{model}, or \textbf{simulator}, for the MDP. Informally, a simulator is
+a black-box that takes as input any (continuous-valued) state $s_t$ and action
+$a_t$, and outputs a next-state $s_{t+1}$ sampled according to the state transition
+probabilities $P_{s_t a_t}$:
+% TODO: Diagram (see supervised learning chapter for template)
+
+There are several ways that one can get such a model. One is to use
+physics simulation. For example, the simulator for the inverted pendulum
+in PS4 was obtained by using the laws of physics to calculate what position
+and orientation the cart/pole will be in at time $t+1$, given the current state
+at time $t$ and the action $a$ taken, assuming that we know all the parameters
+of the system such as the length of the pole, the mass of the pole, and so
+on. Alternatively, one can also use an off-the-shelf physics simulation software
+package which takes as input a complete physical description of a mechanical
+system, the current state $s_t$ and action $a_t$, and computes the state $s_{t+1}$ of the
+system a small fraction of a second into the future.\footnote{
+Open Dynamics Engine (\url{http://www.ode.com}) is one example of a free/open-source
+physics simulator that can be used to simulate systems like the inverted pendulum, and
+that has been a reasonably popular choice among RL researchers.}
+
+An alternative way to get a model is to learn one from data collected in
+the MDP. For example, suppose we execute $n$ trials in which we repeatedly
+take actions in an MDP, each trial for $T$ timesteps. This can be done picking
+actions at random, executing some specific policy, or via some other way of
+choosing actions. We would then observe $n$ state sequences like the following:
+\begin{align*}
+    &s_0^{(1)} \overset{a_0^{(1)}}{\longrightarrow} s_1^{(1)} \overset{a_1^{(1)}}{\longrightarrow} s_2^{(1)} \overset{a_2^{(1)}}{\longrightarrow} s_3^{(1)} \overset{a_3^{(1)}}{\longrightarrow} \overset{a_{T-1}^{(1)}}{\longrightarrow} s_T^{(1)} \\
+    &s_0^{(2)} \overset{a_0^{(2)}}{\longrightarrow} s_1^{(2)} \overset{a_1^{(2)}}{\longrightarrow} s_2^{(2)} \overset{a_2^{(2)}}{\longrightarrow} s_3^{(2)} \overset{a_3^{(2)}}{\longrightarrow} \overset{a_{T-1}^{(2)}}{\longrightarrow} s_T^{(2)} \\
+    &\ldots\\
+    &s_0^{(n)} \overset{a_0^{(n)}}{\longrightarrow} s_1^{(n)} \overset{a_1^{(n)}}{\longrightarrow} s_2^{(n)} \overset{a_2^{(n)}}{\longrightarrow} s_3^{(n)} \overset{a_3^{(n)}}{\longrightarrow} \overset{a_{T-1}^{(n)}}{\longrightarrow} s_T^{(n)}
+\end{align*}
+We can then apply a learning algorithm to predict $s_{t+1}$ as a function of $s_t$ and $a_t$.
+
+For example, one may choose to learn a linear model of the form
+\begin{equation}\label{eq:linear_model}
+    s_{t+1} = As_t + Ba_t,
+\end{equation}
+using an algorithm similar to linear regression. Here, the parameters of the
+model are the matrices $A$ and $B$, and we can estimate them using the data
+collected from our $n$ trials, by picking
+\[
+    \argmin_{A,B} \sum_{i=1}^n \sum_{t=0}^{T-1} \lVert s_{t+1}^{(i)} - \left(As_t^{(i)} + Ba_t^{(i)} \right) \rVert_2^2.
+\]
+
+We could also potentially use other loss functions for learning the model.
+For example, it has been found in recent work [?] that using $\lVert \cdot \rVert_2$ norm % TODO: original source does not have citation.
+(without the square) may be helpful in certain cases.
+
+Having learned $A$ and $B$, one option is to build a \textbf{deterministic} model,
+in which given an input $s_t$ and $a_t$, the output $s_{t+1}$ is exactly determined.
+Specifically, we always compute $s_{t+1}$ according to \cref{eq:linear_model}.
+Alternatively, we may also build a \textbf{stochastic} model, in which $s_{t+1}$ is a random
+function of the inputs, by modeling it as
+\[
+    s_{t+1} = As_t + Ba_t + \epsilon_t,
+\]
+where here $\epsilon_t$ is a noise term, usually modeled as $\epsilon_t \sim \mathcal N(0,\Sigma)$. (The
+covariance matrix $\Sigma$ can also be estimated from data in a straightforward way.)
+
+Here, we've written the next-state $s_{t+1}$ as a linear function of the current
+state and action; but of course, non-linear functions are also possible.
+Specifically, one can learn a model $s_{t+1} = A\phi_s(s_t) + B\phi_a(a_t)$, where $\phi_s$ and $\phi_a$ are
+some non-linear feature mappings of the states and actions. Alternatively,
+one can also use non-linear learning algorithms, such as locally weighted
+linear regression, to learn to estimate $s_{t+1}$ as a function of $s_t$ and $a_t$. These
+approaches can also be used to build either deterministic or stochastic
+simulators of an MDP.
+
+
+\subsection{Fitted value iteration}
+We now describe the \textbf{fitted value iteration} algorithm for approximating
+the value function of a continuous state MDP. In the sequel, we will assume
+that the problem has a continuous state space $S = \mathbb R^d$, but that the action
+space $A$ is small and discrete.\footnote{
+In practice, most MDPs have much smaller action spaces than state spaces. E.g., a car
+has a 6d state space, and a 2d action space (steering and velocity controls); the inverted
+pendulum has a 4d state space, and a 1d action space; a helicopter has a 12d state space,
+and a 4d action space. So, discretizing this set of actions is usually less of a problem than
+discretizing the state space would have been.}
+Recall that in value iteration, we would like to perform the update
+\begin{align}
+    V(s) &:= R(s) + \gamma \max_a \int_{s'} P_{sa}(s')V(s')ds' \label{eq:vi_continuous}\\
+         &= R(s) + \gamma \max_a \mathbb E_{s'\sim P_{sa}}[V(s')]\label{eq:vi_continuous_expectation}
+\end{align}
+(In \cref{sec:vi_pi}, we had written the value iteration update with a summation
+$V(s) := R(s) + \gamma \max_a \sum_{s'} P_{sa}(s')V(s')$ rather than an integral over states;
+the new notation reflects that we are now working in continuous states rather
+than discrete states.)
+
+The main idea of fitted value iteration is that we are going to
+approximately carry out this step, over a finite sample of states $s^{(1)},\ldots,s^{(n)}$.
+Specifically, we will use a supervised learning algorithm---linear regression in our
+description below---to approximate the value function as a linear or
+non-linear function of the states:
+\[
+    V(s) = \theta^\top \phi(s).
+\]
+Here, $\phi$ is some appropriate feature mapping of the states.
+
+For each state $s$ in our finite sample of $n$ states, fitted value iteration
+will first compute a quantity $y^{(i)}$, which will be our approximation
+to $R(s) + \gamma \max_a \mathbb E_{s'\sim P_{sa}}[V(s')]$ (the right hand side of \cref{eq:vi_continuous_expectation}). Then,
+it will apply a supervised learning algorithm to try to get $V(s)$ close to
+$R(s) + \gamma \max_a \mathbb E_{s'\sim P_{sa}}[V(s')]$ (or, in other words, to try to get $V(s)$ close to
+$y^{(i)}$).
+
+In detail, the algorithm is as follows:
+% TODO: \begin{algorithm}
+\begin{enumerate}
+    \item Randomly sample $n$ states $s^{(1)},s^{(2)},\ldots, s^{(n)} \in S$. % TYPO: added comma
+    \item Initialize $\theta := 0$.
+    \item Repeat:
+    \begin{itemize}
+        \item[] For $i = 1,\ldots,n$
+        \begin{itemize}
+            \item[] For each action $a \in A$
+            \begin{itemize}
+                \item[] Sample $s'_1,\ldots,s'_k \sim P_{s^(i) a}$ (using a model of the MDP).
+                \item[] Set $q(a) = \frac{1}{k} \sum_{j=1}^k R(s^{(i)}) + \gamma V(s'_j)$
+                \item[] // Hence, $q(a)$ is an estimate of $R(s^{(i)})+\gamma \mathbb E_{s'\sim P_{s^{(i)} a}}[V(s')]$.
+            \end{itemize}
+            \item[] Set $y^{(i)} = \max_a q(a)$.
+            \item[] // Hence, $y^{(i)}$ is an estimate of $R(s^{(i)})+\gamma \max_a \mathbb E_{s'\sim P_{s^{(i)} a}} [V(s')]$.
+        \end{itemize}
+        \item[] // In the original value iteration algorithm (over discrete states)
+        \item[] // we updated the value function according to $V(s^{(i)}) := y^{(i)}$.
+        \item[] // In this algorithm, we want $V(s^{(i)}) \approx y^{(i)}$, which we'll achieve
+        \item[] // using supervised learning (linear regression).
+        \item[] Set $\theta := \argmin_\theta \frac{1}{2}\sum^n_{i=1}\left( \theta^\top \phi(s^{(i)}) - y^{(i)} \right)^2$
+    \end{itemize}
+\end{enumerate}
+
+Above, we had written out fitted value iteration using linear regression
+as the algorithm to try to make $V(s^{(i)})$ close to $y^{(i)}$. That step of the
+algorithm is completely analogous to a standard supervised learning (regression)
+problem in which we have a training set $(x^{(1)},y^{(1)}),(x^{(2)},y^{(2)}),\ldots,(x^{(n)},y^{(n)})$,
+and want to learn a function mapping from $x$ to $y$; the only difference is that
+here $s$ plays the role of $x$. Even though our description above used linear
+regression, clearly other regression algorithms (such as locally weighted linear
+regression) can also be used.
+
+Unlike value iteration over a discrete set of states, fitted value iteration
+cannot be proved to always to converge. However, in practice, it often does
+converge (or approximately converge), and works well for many problems.
+Note also that if we are using a deterministic simulator/model of the MDP,
+then fitted value iteration can be simplified by setting $k = 1$ in the algorithm.
+This is because the expectation in \cref{eq:vi_continuous_expectation} becomes an expectation over
+a deterministic distribution, and so a single example is sufficient to exactly
+compute that expectation. Otherwise, in the algorithm above, we had to
+draw $k$ samples, and average to try to approximate that expectation (see the
+definition of $q(a)$, in the algorithm pseudo-code).
+
+Finally, fitted value iteration outputs $V$, which is an approximation to
+$V^*$. This implicitly defines our policy. Specifically, when our system is in
+some state $s$, and we need to choose an action, we would like to choose the
+action
+\begin{equation}\label{eq:policy_expectation}
+    \argmax_a \mathbb E_{s'\sim P_{sa}}[V(s')]
+\end{equation}
+The process for computing/approximating this is similar to the inner-loop of
+fitted value iteration, where for each action, we sample $s'_1,\ldots,s'_k \sim P_{sa}$ to
+approximate the expectation. (And again, if the simulator is deterministic,
+we can set $k = 1$.)
+
+In practice, there are often other ways to approximate this step as well.
+For example, one very common case is if the simulator is of the form $s_{t+1} =
+f(s_t ,a_t) + \epsilon_t$, where $f$ is some deterministic function of the states (such as
+$f(s_t ,a_t ) = As_t + Ba_t$), and $\epsilon$ is zero-mean Gaussian noise. In this case, we
+can pick the action given by
+\[
+    \argmax_a V(f(s,a)).
+\]
+In other words, here we are just setting $\epsilon_t = 0$ (i.e., ignoring the noise in
+the simulator), and setting $k = 1$. Equivalent, this can be derived from \cref{eq:policy_expectation} using the approximation
+\begin{align}
+    \mathbb E_{s'}[V (s')] &\approx V(\mathbb E_{s'}[s'])\label{eq:approx_expected_value}\\
+                           &= V(f(s,a)), \label{eq:approx_expected_value_f}
+\end{align}
+where here the expectation is over the random $s'\sim P_{sa}$. So long as the noise
+terms $\epsilon_t$ are small, this will usually be a reasonable approximation.
+
+However, for problems that don't lend themselves to such approximations,
+having to sample $k|A|$ states using the model, in order to approximate the
+expectation above, can be computationally expensive.
+
+\chapter{Connections between Policy and Value Iteration (Optional)}\label{sec:connections_pi_vi}
+% TODO: line number \cref{}
+In the policy iteration, line 3 of \cref{alg:pi}, we typically use linear system
+solver to compute $V^\pi$.
+Alternatively, one can also the iterative Bellman
+updates, similarly to the value iteration, to evaluate $V^\pi$, as in the Procedure
+VE($\cdot$) in line 1 of \cref{alg:pi_variant} below. Here if we take option 1 in line 2 of
+the Procedure VE, then the difference between the Procedure VE from the
+value iteration (\cref{alg:vi}) is that on line 4, the procedure is using the
+action from $\pi$ instead of the greedy action.
+
+\begin{algorithm}[ht]
+    \caption{Variant of policy iteration.}
+    \label{alg:pi_variant}
+    \begin{algorithmic}
+    \Function{VE}{$\pi, k$} \algorithmiccomment{to evaluate $V^\pi$}
+        \State Option 1: Initialize $V(s) := 0$
+        \State Option 2: Initialize from the current $V$ in the main algorithm.
+        \For{$i=0$ to $k-1$}
+            \For{every state $s$, update}
+                \State \begin{equation}\label{eq:pi_variant_value}
+                    V(s) := R(s) + \gamma \sum_{s'} P_{s\pi(s)}(s')V(s').
+                \end{equation}
+            \EndFor
+        \EndFor
+        \State \Return $V$
+    \EndFunction
+    \State \textbf{Require:} hyperparameter $k$.
+    \State Initialize $\pi$ randomly.
+    \Repeat
+        \State Let $V = \operatorname{VE}(\pi,k)$.
+        \For{every state $s$, update}
+            \State \begin{equation}\label{eq:pi_variant_policy}
+                \pi(s) := \argmax_{a \in A} \sum_{s'} P_{s\pi(s)}(s')V(s').
+            \end{equation}            
+        \EndFor
+    \Until{convergence}
+    \end{algorithmic}
+\end{algorithm}
+
+Using the Procedure VE, we can build \cref{alg:pi_variant}, which is a variant of
+policy iteration that serves an intermediate algorithm that connects policy
+iteration and value iteration. Here we are going to use option 2 in VE to
+maximize the re-use of knowledge learned before. One can verify indeed that
+if we take $k = 1$ and use option 2 in line 2 in \cref{alg:pi_variant}, then \cref{alg:pi_variant}
+is semantically equivalent to value iteration (\cref{alg:pi}). In other words,
+both \cref{alg:pi_variant} and value iteration interleave the updates in \cref{eq:pi_variant_policy} and \cref{eq:pi_variant_value}.
+\cref{alg:pi_variant} alternate between $k$ steps of update \cref{eq:pi_variant_value} and one step of \cref{eq:pi_variant_policy},
+whereas value iteration alternates between $1$ step of update \cref{eq:pi_variant_value} and one % TYPO: "steps"
+step of \cref{eq:pi_variant_policy}. Therefore generally \cref{alg:pi_variant} should not be faster than value
+iteration, because assuming that update \cref{eq:pi_variant_value} and \cref{eq:pi_variant_policy} are equally useful and
+time-consuming, then the optimal balance of the update frequencies could
+be just $k = 1$ or $k \approx 1$.
+
+On the other hand, if $k$ steps of update \cref{eq:pi_variant_value} can be done much faster than
+$k$ times a single step of \cref{eq:pi_variant_value}, then taking additional steps of equation \cref{eq:pi_variant_value}
+in group might be useful. This is what policy iteration is leveraging---the
+linear system solver can give us the result of Procedure VE with $k = \infty$ much
+faster than using the Procedure VE for a large $k$. On the flip side, when such
+a speeding-up effect no longer exists, e.g., when the state space is large and %TYPO: double ,,
+linear system solver is also not fast, then value iteration is more preferable.
+
+
+\chapter{Derivations for Bellman Equations}\label{sec:bellman_derivation}
+Here we give a derivation for the Bellman Equation given in \cref{sec:mdp}. Recall
+that the value function for a policy $\pi$ is defined as
+\[
+V^\pi(s) = \mathbb E \left[ R(s_0) + \gamma R(s_1 ) + \gamma^2 R(s_2) + \cdots \mid s_0 = s,\pi\right].
+\]
+Therefore, we have
+\begin{align*}
+    V^\pi(s) &= \mathbb E \left[ R(s_0) + \gamma R(s_1 ) + \gamma^2 R(s_2) + \cdots \mid s_0 = s,\pi\right]\\
+        &= R(s) + \gamma \mathbb E[R(s_1 ) + \gamma R(s_2) + \cdots]\\
+        &= R(s) + \gamma \mathbb E_{s_1 \sim P_{s\pi(s)}} [R(s_1 ) + \gamma R(s_2) + \cdots]\\
+        &= R(s) + \gamma \mathbb E_{s_1 \sim P_{s\pi(s)}} [V^\pi(s_1)]. % TYPO: comma.
+\end{align*}
+Now we derive the Bellman Equation for the optimal value function. % DIFF: No paragraph indent.
+\begin{align*}
+    V^*(s) &= \max_\pi V^\pi(s)\\
+        &= \max_\pi \left( R(s) + \gamma  \sum_{s'\in S} P_{s\pi(s)}(s')V^\pi(s') \right)\\
+        &= R(s) + \max_\pi \left(\gamma \sum_{s'\in S} P_{s\pi(s)}(s')V^\pi(s') \right)\\
+        &= R(s) + \max_a \gamma \sum_{s'\in S} P_{sa}(s') \max_\pi V^\pi(s')\\
+        &= R(s) + \max_{a\in A} \gamma \sum_{s'\in S} P_{sa}(s')V^*(s').
+\end{align*}
+Here the fourth equality is because that for MDP, the optimal action at a
+later state is independent of actions at previous states, hence the optimal
+policy at the current state can be decomposed to an action followed by the
+optimal policy at the new state.

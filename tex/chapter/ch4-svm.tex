@@ -72,7 +72,7 @@ Here, $g(z) = 1$ if $z \ge 0$, and $g(z) = -1$ otherwise. This ``$w,b$'' notatio
 allows us to explicitly treat the intercept term $b$ separately from the other
 parameters. (We also drop the convention we had previously of letting $x_0 = 1$
 be an extra coordinate in the input feature vector.) Thus, $b$ takes the role of
-what was previously $\theta_0$ , and $w$ takes the role of $[\theta_1 \ldots \theta_d]^\top$.
+what was previously $\theta_0$, and $w$ takes the role of $[\theta_1 \ldots \theta_d]^\top$.
 
 Note also that, from our definition of $g$ above, our classifier will directly
 predict either $1$ or $-1$ (\textit{cf.} the perceptron algorithm), without first going % DIFF: italic cf.
@@ -127,7 +127,7 @@ label $y^{(i)} = 1$. Its distance to the decision boundary, $\gamma^{(i)}$, is g
 segment AB.
 
 How can we find the value of $\gamma^{(i)}$ ? Well, $w/\lVert w \lVert$ is a unit-length vector
-pointing in the same direction as $w$. Since A represents $x^{(i)}$ , we therefore
+pointing in the same direction as $w$. Since A represents $x^{(i)}$, we therefore
 find that the point B is given by $x^{(i)} - \gamma^{(i)} \cdot w/\lVert w \rVert$. But this point lies on
 the decision boundary, and all points $x$ on the decision boundary satisfy the
 equation $w^\top x + b = 0$. Hence,
@@ -237,7 +237,7 @@ dimensional spaces. The dual form will also allow us to derive an efficient
 algorithm for solving the above optimization problem that will typically do
 much better than generic QP software.
 
-\section{Lagrange duality (optional reading)}
+\section{($\dagger^+$) Lagrange duality (optional reading)}
 Let's temporarily put aside SVMs and maximum margin classifiers, and talk
 about solving constrained optimization problems.
 Consider a problem of the following form:
@@ -342,14 +342,14 @@ When $f$ has a Hessian, then it is convex if and only if the Hessian is positive
 For instance, $f(w) = w^\top w$ is convex; similarly, all linear (and affine) functions
 are also convex. (A function $f$ can also be convex without being differentiable, but we
 won't need those more general definitions of convexity here.)} and the $h_i$'s are affine.\footnote{
-I.e., there exists $a_i , b_i$ , so that $h_i (w) = a^\top_i w + b_i$. ``Affine'' means the same thing as
+I.e., there exists $a_i , b_i$, so that $h_i (w) = a^\top_i w + b_i$. ``Affine'' means the same thing as
 linear, except that we also allow the extra intercept term $b_i$.} Suppose
 further that the constraints $g_i$ are (strictly) feasible; this means that there
 exists some $w$ so that $g_i (w) < 0$ for all $i$.
 
 Under our above assumptions, there must exist $w^* ,\alpha^* ,\beta^*$ so that $w^*$ is the
-solution to the primal problem, $\alpha^*$ ,$\beta^*$ are the solution to the dual problem,
-and moreover $p^* = d^* = L(w^* ,\alpha^* ,\beta^*)$. Moreover, $w^*$ ,$\alpha^*$ and $\beta^*$ satisfy the
+solution to the primal problem, $\alpha^*$,$\beta^*$ are the solution to the dual problem,
+and moreover $p^* = d^* = L(w^* ,\alpha^* ,\beta^*)$. Moreover, $w^*$,$\alpha^*$ and $\beta^*$ satisfy the
 \textbf{Karush-Kuhn-Tucker (KKT) conditions}, which are as follows:
 \begin{align}
     \frac{\partial}{\partial w_i} \mathcal L(w^* ,\alpha^* ,\beta^* ) &= 0, \quad i = 1,\ldots ,d\label{eq:kkt1}\\
@@ -403,7 +403,7 @@ than the size the training set will be useful later.
 
 Let's move on. Looking ahead, as we develop the dual form of the problem,
 one key idea to watch out for is that we'll try to write our algorithm
-in terms of only the inner product $\langle x^{(i)} ,x^{(j)} \rangle$ (think of this as $(x^{(i)} )^\top x^{(j)}$ )
+in terms of only the inner product $\langle x^{(i)} ,x^{(j)} \rangle$ (think of this as $(x^{(i)} )^\top x^{(j)}$)
 between points in the input feature space. The fact that we can express our
 algorithm in terms of these inner products will be key when we apply the
 kernel trick.
@@ -416,7 +416,7 @@ Note that there're only ``$\alpha_i$'' but no ``$\beta_i$'' Lagrange multipliers
 problem has only inequality constraints.
 
 Let's find the dual form of the problem. To do so, we need to first
-minimize $\mathcal L(w,b,\alpha)$ with respect to $w$ and $b$ (for fixed $\alpha$), to get $\theta_{\mathcal D}$ , which
+minimize $\mathcal L(w,b,\alpha)$ with respect to $w$ and $b$ (for fixed $\alpha$), to get $\theta_{\mathcal D}$, which
 we'll do by setting the derivatives of $\mathcal L$ with respect to $w$ and $b$ to zero. We
 have:
 \begin{equation*}
@@ -458,7 +458,7 @@ maximization problem in which the parameters are the $\alpha_i$'s. We'll talk la
 about the specific algorithm that we're going to use to solve the dual problem,
 but if we are indeed able to solve it (i.e., find the $\alpha$'s that maximize $W(\alpha)$
 subject to the constraints), then we can use \Cref{eq:w_alpha_dual} to go back and
-find the optimal $w$'s as a function of the $\alpha$'s. Having found $w^*$ , by considering
+find the optimal $w$'s as a function of the $\alpha$'s. Having found $w^*$, by considering
 the primal problem, it is also straightforward to find the optimal value for
 the intercept term $b$ as
 \begin{equation}
@@ -607,7 +607,7 @@ Here's the (dual) optimization problem that we want to solve:
 \begin{align}
     \max_\alpha \quad& W(\alpha) = \sum_{i=1}^n \alpha_i - \frac{1}{2} \sum_{i,j=1}^n y^{(i)} y^{(j)} \alpha_i \alpha_j \langle x^{(i)} ,x^{(j)} \rangle\label{eq:smo_dual_max}.\\
     \operatorname{s.t.} \quad& 0 \le \alpha_i \le C, \quad i = 1,\ldots,n\label{eq:smo_dual_st1}\\
-    \quad& \sum_{i=1}^n \alpha_i y^{(i)} = 0\label{eq:smo_dual_st2}. (33)
+    \quad& \sum_{i=1}^n \alpha_i y^{(i)} = 0\label{eq:smo_dual_st2}. 
 \end{align}
 
 Let's say we have set of $\alpha_i$'s that satisfy the constraints in \cref{eq:smo_dual_st1,eq:smo_dual_st2}. Now,
@@ -656,7 +656,7 @@ the constraints). From \cref{eq:smo_dual_st2}, we require that
 \begin{equation*}
     \alpha_1 y^{(1)} + \alpha_2 y^{(2)} = -\sum_{i=3}^n \alpha_i y^{(i)}.
 \end{equation*}
-Since the right hand side is fixed (as we've fixed $\alpha_3 ,\ldots\alpha_n$ ), we can just let
+Since the right hand side is fixed (as we've fixed $\alpha_3 ,\ldots\alpha_n$), we can just let
 it be denoted by some constant $\zeta$:
 \begin{equation*}
     \alpha_1 y^{(1)} + \alpha_2 y^{(2)} = \zeta\label{eq:alpha_zeta}.

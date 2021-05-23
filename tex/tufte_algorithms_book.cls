@@ -514,6 +514,7 @@
 
 \theoremstyle{definition}
 \newtheorem{thm}{Theorem}[chapter]
+\newtheorem{lemma}[thm]{Lemma}
 \newtheorem{question}[thm]{Exercise}
 \newenvironment{solution}{\noindent\textit{Solution:}}{}
 \excludecomment{ignore}
