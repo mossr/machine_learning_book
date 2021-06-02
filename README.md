@@ -2,7 +2,10 @@
 
 <!-- [![pipeline status](https://gitlab.com/johnnychen94/tufte_algorithms_book/badges/master/pipeline.svg)](https://gitlab.com/johnnychen94/tufte_algorithms_book/commits/master) -->
 
-This book is generated entirely in LaTeX from lecture notes for the course _Machine Learning_ at Stanford University, [CS229](https://cs229.stanford.edu), originally written by Andrew Ng, Christopher Ré, Moses Charikar, Tengyu Ma, Anand Avati, Kian Katanforoosh, Yoann Le Calonnec, and John Duchi.
+[![PDF](https://img.shields.io/badge/pdf-machine%20learning-d2c295)](https://github.com/mossr/machine_learning_book/blob/master/ml.pdf)
+
+
+This book is generated entirely in LaTeX from lecture notes for the course _Machine Learning_ at Stanford University, [CS229](http://cs229.stanford.edu/), originally written by Andrew Ng, Christopher Ré, Moses Charikar, Tengyu Ma, Anand Avati, Kian Katanforoosh, Yoann Le Calonnec, and John Duchi.
 This collection is a typesetting of existing lecture notes.
 Forked from the template [tufte_algorithms_book](https://github.com/sisl/tufte_algorithms_book) used for Algorithms for Optimization.
 The template allows for the direct compilation of a print-ready PDF, including support for figures, examples, and exercises.
