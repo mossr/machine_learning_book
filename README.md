@@ -2,8 +2,8 @@
 
 <!-- [![pipeline status](https://gitlab.com/johnnychen94/tufte_algorithms_book/badges/master/pipeline.svg)](https://gitlab.com/johnnychen94/tufte_algorithms_book/commits/master) -->
 
-This book is generated entirely in LaTeX from lecture notes for the course _Machine Learning_ at Stanford University, [CS229](https://cs229.stanford.edu), originally written by Andrew Ng and Chris Ré.
-The contributors to the content of this work are Percy Liang and Dorsa Sadign---this collection is a typesetting of existing lecture notes with additions of working Julia implementations. 
+This book is generated entirely in LaTeX from lecture notes for the course _Machine Learning_ at Stanford University, [CS229](https://cs229.stanford.edu), originally written by Andrew Ng, Christopher Ré, Moses Charikar, Tengyu Ma, Anand Avati, Kian Katanforoosh, Yoann Le Calonnec, and John Duchi.
+This collection is a typesetting of existing lecture notes.
 Forked from the template [tufte_algorithms_book](https://github.com/sisl/tufte_algorithms_book) used for Algorithms for Optimization.
 The template allows for the direct compilation of a print-ready PDF, including support for figures, examples, and exercises.
 
